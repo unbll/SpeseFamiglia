@@ -421,55 +421,47 @@ function App() {
 
   // Calculate balance for current period
   const calculateBalance = useCallback(() => {
-    let totalPaidBy1 = 0;
-    let totalPaidBy2 = 0; // Questa variabile è necessaria per il calcolo interno, anche se user2Net non è usato direttamente
-    let totalOverallExpensesForShare = 0; // Nuovo totale per la divisione equa
+    let user1NetBalance = 0; // Rappresenta la posizione netta di user1 (quanto ha pagato in più/meno, inclusi i ripianamenti)
+    let totalOverallExpensesForShare = 0; // Totale delle spese da dividere equamente (escluse quelle di ripianamento)
 
     expenses.forEach(expense => {
       const actualPayer = getActualPayerForCalculation(expense.paidBy, userName1, userName2);
 
-      // Le spese di ripianamento contano per i totali individuali pagati,
-      // ma non per il totale complessivo da dividere equamente.
       if (!isSettlementExpense(expense)) {
+        // Spesa normale: contribuisce al totale complessivo da dividere
         totalOverallExpensesForShare += expense.amount;
         if (actualPayer === userName1) {
-          totalPaidBy1 += expense.amount;
+          user1NetBalance += expense.amount; // User1 ha pagato, il suo saldo netto aumenta
         } else if (actualPayer === userName2) {
-          totalPaidBy2 += expense.amount;
+          user1NetBalance -= expense.amount; // User2 ha pagato, il saldo netto di user1 diminuisce (user1 deve di più)
         }
       } else {
-        // Questa è una spesa di ripianamento. Rappresenta un trasferimento diretto.
-        // Deve aggiustare i totali individuali *senza* influenzare le spese condivise complessive.
-        // Se expense.paidBy è userName2 (quindi userName2 ha pagato userName1),
-        // il contributo di userName2 aumenta e quello di userName1 diminuisce.
+        // Spesa di ripianamento: trasferimento diretto di denaro, non contribuisce alle spese condivise
         if (expense.paidBy === userName2) { 
-          totalPaidBy2 += expense.amount; 
-          totalPaidBy1 -= expense.amount; 
+          user1NetBalance += expense.amount; // userName2 ha pagato userName1, quindi il saldo netto di userName1 aumenta
         } else if (expense.paidBy === userName1) { 
-          totalPaidBy1 += expense.amount; 
-          totalPaidBy2 -= expense.amount; 
+          user1NetBalance -= expense.amount; // userName1 ha pagato userName2, quindi il saldo netto di userName1 diminuisce
         }
       }
     });
 
     const sharePerPerson = totalOverallExpensesForShare / 2;
 
-    const user1Net = totalPaidBy1 - sharePerPerson; 
-    // user2Net non è più utilizzato direttamente per il summary, ma totalPaidBy2 è necessario per calcolare user1Net correttamente
-    // const user2Net = totalPaidBy2 - sharePerPerson; 
+    // Il saldo finale di user1 è la sua posizione netta accumulata meno la sua quota delle spese complessive
+    const finalUser1Net = user1NetBalance - sharePerPerson;
 
     let summary = 'Siete in pari!';
     // Usa un piccolo epsilon per il confronto con i numeri floating point
-    if (Math.abs(user1Net) < 0.01) { // Se il saldo è effettivamente zero
+    if (Math.abs(finalUser1Net) < 0.01) { // Se il saldo è effettivamente zero
         summary = 'Siete in pari!';
-    } else if (user1Net > 0) { 
-        summary = `${userName2} deve dare ${userName1} ${Math.abs(user1Net).toFixed(2)}€`;
-    } else { // user1Net < 0
-        summary = `${userName1} deve dare ${userName2} ${Math.abs(user1Net).toFixed(2)}€`;
+    } else if (finalUser1Net > 0) { 
+        summary = `${userName2} deve dare ${userName1} ${Math.abs(finalUser1Net).toFixed(2)}€`;
+    } else { // finalUser1Net < 0
+        summary = `${userName1} deve dare ${userName2} ${Math.abs(finalUser1Net).toFixed(2)}€`;
     }
 
     return {
-      netBalance: user1Net, 
+      netBalance: finalUser1Net, 
       summary: summary
     };
   }, [expenses, userName1, userName2, isSettlementExpense]); 
