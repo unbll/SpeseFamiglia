@@ -40,7 +40,7 @@ const appId = 'spese-famiglia-casetta'; // <-- INSERISCI QUI IL TUO ID LOGICO UN
 
 function App() {
   const [db, setDb] = useState(null);
-  const [auth, setAuth] = useState(null);
+  // const [auth, setAuth] = useState(null); // Rimosso: l'istanza auth viene usata direttamente
   const [userId, setUserId] = useState(null);
   const [expenses, setExpenses] = useState([]);
   const [description, setDescription] = useState('');
@@ -101,16 +101,15 @@ function App() {
       try {
         const app = initializeApp(firebaseConfig);
         const firestoreDb = getFirestore(app);
-        const firebaseAuth = getAuth(app);
+        const firebaseAuth = getAuth(app); // Ottieni l'istanza di auth qui
 
         setDb(firestoreDb);
-        setAuth(firebaseAuth);
+        // setAuth(firebaseAuth); // Non più necessario memorizzare auth nello stato se non usato altrove
 
         // Su Firebase Hosting, useremo l'autenticazione anonima o altri metodi Firebase.
-        // Abbiamo rimosso la dipendenza da __initial_auth_token che è specifica dell'ambiente Canvas.
-        await signInAnonymously(firebaseAuth);
+        await signInAnonymously(firebaseAuth); // Usa direttamente firebaseAuth
         
-        onAuthStateChanged(firebaseAuth, (user) => {
+        onAuthStateChanged(firebaseAuth, (user) => { // Usa direttamente firebaseAuth
           if (user) {
             setUserId(user.uid);
             console.log("Authenticated with userId:", user.uid);
@@ -128,7 +127,7 @@ function App() {
     };
 
     initializeFirebase();
-  }, [firebaseConfig]); // initialAuthToken rimosso dalle dipendenze
+  }, []); // Rimosso firebaseConfig dalle dipendenze, poiché è una costante esterna
 
   // Fetch expenses from Firestore
   useEffect(() => {
