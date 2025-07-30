@@ -40,7 +40,6 @@ const appId = 'spese-famiglia-casetta'; // <-- INSERISCI QUI IL TUO ID LOGICO UN
 
 function App() {
   const [db, setDb] = useState(null);
-  // const [auth, setAuth] = useState(null); // Rimosso: l'istanza auth viene usata direttamente
   const [userId, setUserId] = useState(null);
   const [expenses, setExpenses] = useState([]);
   const [description, setDescription] = useState('');
@@ -101,15 +100,12 @@ function App() {
       try {
         const app = initializeApp(firebaseConfig);
         const firestoreDb = getFirestore(app);
-        const firebaseAuth = getAuth(app); // Ottieni l'istanza di auth qui
+        const firebaseAuth = getAuth(app);
 
         setDb(firestoreDb);
-        // setAuth(firebaseAuth); // Non più necessario memorizzare auth nello stato se non usato altrove
-
-        // Su Firebase Hosting, useremo l'autenticazione anonima o altri metodi Firebase.
-        await signInAnonymously(firebaseAuth); // Usa direttamente firebaseAuth
+        await signInAnonymously(firebaseAuth);
         
-        onAuthStateChanged(firebaseAuth, (user) => { // Usa direttamente firebaseAuth
+        onAuthStateChanged(firebaseAuth, (user) => {
           if (user) {
             setUserId(user.uid);
             console.log("Authenticated with userId:", user.uid);
@@ -127,7 +123,7 @@ function App() {
     };
 
     initializeFirebase();
-  }, []); // Rimosso firebaseConfig dalle dipendenze, poiché è una costante esterna
+  }, []);
 
   // Fetch expenses from Firestore
   useEffect(() => {
@@ -137,8 +133,6 @@ function App() {
     }
 
     console.log("Fetching expenses for userId:", userId);
-    // Path per i dati pubblici su Firestore: /artifacts/{appId}/public/data/{your_collection_name}
-    // Assicurati che le regole di sicurezza di Firestore permettano la lettura/scrittura per gli utenti autenticati.
     const expensesCollectionRef = collection(db, `artifacts/${appId}/public/data/expenses`);
     const q = query(expensesCollectionRef);
 
@@ -479,15 +473,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-zinc-900 text-gray-100 font-inter p-4 sm:p-6 md:p-8 flex flex-col items-center">
-      {/* Tailwind CSS and Inter font configuration */}
-      <script src="https://cdn.tailwindcss.com"></script>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        body {
-          font-family: 'Inter', sans-serif;
-        }
-      `}</style>
-
+      {/* Rimosso: Tailwind CSS e Inter font configuration spostati in public/index.html */}
       <div className="w-full max-w-3xl bg-zinc-800 rounded-xl shadow-lg p-6 sm:p-8 md:p-10 mb-8">
         <h1 className="text-3xl sm:text-4xl font-bold text-purple-400 mb-4 text-center">
           Gestione Spese di Coppia
