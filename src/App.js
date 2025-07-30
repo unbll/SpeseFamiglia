@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
-  createUserWithEmailAndPassword, 
+  createUserWithEmailAndPassword, // Mantenuto per riferimento, ma non usato nell'interfaccia
   signInWithEmailAndPassword, 
   signOut, 
   onAuthStateChanged 
@@ -464,7 +464,7 @@ function App() {
     }
   };
 
-  // Handle user sign-up
+  // Handle user sign-up (Questa funzione non è più chiamata nell'interfaccia)
   const handleSignUp = async () => {
     if (!email || !password) {
       setError("Per favore, inserisci email e password.");
@@ -545,7 +545,7 @@ function App() {
           Gestione Spese di Coppia
         </h1>
         <p className="text-gray-400 text-center mb-6">
-          {user ? `Benvenuto, ${user.email}!` : "Accedi o Registrati per gestire le tue spese."}
+          {user ? `Benvenuto, ${user.email}!` : "Accedi per gestire le tue spese."}
           {user && <span className="font-mono text-sm break-all block mt-2">ID Utente: {userId}</span>}
         </p>
 
@@ -557,7 +557,7 @@ function App() {
 
         {!user ? ( // Mostra la schermata di login/registrazione se l'utente non è autenticato
           <div className="bg-zinc-700 p-6 rounded-lg shadow-inner mb-8">
-            <h2 className="text-2xl font-semibold text-purple-300 mb-4 text-center">Accedi o Registrati</h2>
+            <h2 className="text-2xl font-semibold text-purple-300 mb-4 text-center">Accedi</h2>
             <div className="mb-4">
               <label htmlFor="email" className="block text-gray-300 text-sm font-medium mb-1">Email</label>
               <input
@@ -587,12 +587,7 @@ function App() {
               >
                 Accedi
               </button>
-              <button
-                onClick={handleSignUp}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 ease-in-out shadow-md hover:shadow-lg"
-              >
-                Registrati
-              </button>
+              {/* Pulsante Registrati rimosso */}
             </div>
           </div>
         ) : ( // Mostra il contenuto dell'app se l'utente è autenticato
