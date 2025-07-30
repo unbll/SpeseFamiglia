@@ -141,7 +141,7 @@ function App() {
     }
 
     console.log("Fetching expenses for userId:", userId);
-    // NUOVO PERCORSO: artifacts/{appId}/users/{userId}/expenses
+    // NUOVO PERCORSO: artifacts/${appId}/users/${userId}/expenses
     const expensesCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/expenses`);
     const q = query(expensesCollectionRef);
 
@@ -162,9 +162,9 @@ function App() {
     return () => unsubscribeFirestore();
   }, [db, userId]); 
 
-  // New useEffect to load and save couple names from Firestore
+  // New useEffect to load couple names from Firestore
   useEffect(() => {
-    if (!db || !userId) { // Load settings only if DB is ready and user is authenticated
+    if (!db || !userId) { 
       return;
     }
 
@@ -180,10 +180,7 @@ function App() {
         setEditingUserName2(data.user2Name || 'La mia ragazza');
         console.log("Couple names loaded from Firestore:", data);
       } else {
-        // If document doesn't exist, save default names
-        console.log("Couple names document not found, saving defaults.");
-        // Non chiamiamo setDoc qui per evitare un loop infinito o scritture non necessarie
-        // La funzione saveCoupleNames è chiamata dal useEffect sottostante quando userName1/2 cambiano.
+        console.log("Couple names document not found.");
       }
     }, (err) => {
       console.error("Error fetching couple names settings:", err);
@@ -191,36 +188,34 @@ function App() {
     });
 
     return () => unsubscribeSettings();
-  }, [db, userId]); // Rimosso userName1 e userName2 dalle dipendenze per evitare loop con onSnapshot
+  }, [db, userId]); 
 
   // Function to save couple names to Firestore
-  const saveCoupleNames = useCallback(async () => {
+  // Questa funzione ora accetta i nomi come argomenti
+  const saveCoupleNames = useCallback(async () => { // Rimosso argomenti espliciti, userà editingUserName1/2
     if (!db || !userId) {
+      setError("Database non disponibile o utente non autenticato."); // Reimposta l'errore qui per feedback immediato
       return;
     }
     try {
+      setLoading(true); // Mostra il caricamento solo al click del pulsante
       const settingsDocRef = doc(db, `artifacts/${appId}/settings/couple_names`);
       await setDoc(settingsDocRef, {
-        user1Name: userName1,
-        user2Name: userName2
+        user1Name: editingUserName1, // Usa i nomi dagli stati di editing
+        user2Name: editingUserName2  // Usa i nomi dagli stati di editing
       }, { merge: true }); 
       setError(null); 
       console.log("Couple names saved successfully.");
     } catch (e) {
       console.error("Error saving couple names: ", e);
       setError("Errore nel salvataggio dei nomi della coppia. Riprova.");
+    } finally {
+      setLoading(false); // Nascondi il caricamento
     }
-  }, [db, userId, userName1, userName2]); 
+  }, [db, userId, editingUserName1, editingUserName2]); // Dipendenze per useCallback
 
-  // Call saveCoupleNames whenever userName1 or userName2 change (after debounce)
-  useEffect(() => {
-    if (db && userId) { 
-      const handler = setTimeout(() => {
-        saveCoupleNames();
-      }, 500); 
-      return () => clearTimeout(handler); 
-    }
-  }, [userName1, userName2, db, userId, saveCoupleNames]); 
+  // Rimosso il useEffect precedente che chiamava saveCoupleNames con debounce.
+  // Ora il salvataggio è gestito direttamente dal pulsante.
 
 
   // Process overall spending data (perpetual, monthly/annual averages, and by category)
@@ -991,7 +986,7 @@ function App() {
                         className="w-full p-3 rounded-lg bg-zinc-900 border border-zinc-700 focus:ring-purple-500 focus:border-purple-500 text-gray-100"
                         value={editingUserName1} // Usa lo stato di editing locale
                         onChange={(e) => setEditingUserName1(e.target.value)} // Aggiorna lo stato di editing locale
-                        onBlur={() => setUserName1(editingUserName1)} // Aggiorna lo stato globale solo al blur
+                        // Rimosso onBlur per consentire la digitazione libera
                       />
                     </div>
                     <div>
@@ -1002,13 +997,19 @@ function App() {
                         className="w-full p-3 rounded-lg bg-zinc-900 border border-zinc-700 focus:ring-purple-500 focus:border-purple-500 text-gray-100"
                         value={editingUserName2} // Usa lo stato di editing locale
                         onChange={(e) => setEditingUserName2(e.target.value)} // Aggiorna lo stato di editing locale
-                        onBlur={() => setUserName2(editingUserName2)} // Aggiorna lo stato globale solo al blur
+                        // Rimosso onBlur per consentire la digitazione libera
                       />
                     </div>
                   </div>
                   <p className="text-gray-400 text-sm mt-4">
                     I nomi utente vengono utilizzati per i calcoli del saldo.
                   </p>
+                  <button
+                    onClick={saveCoupleNames} // Chiama la funzione di salvataggio esplicitamente
+                    className="w-full mt-4 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 ease-in-out shadow-md hover:shadow-lg"
+                  >
+                    Salva Nomi
+                  </button>
                 </div>
               )}
             </div>
