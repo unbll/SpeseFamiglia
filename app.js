@@ -1,20 +1,42 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query } from 'firebase/firestore';
 
-// Variabili di configurazione Firebase (DA SOSTITUIRE CON I TUOI DATI REALI!)
+// ********************************************************************************
+// * PASSO FONDAMENTALE: SOSTITUISCI QUESTI VALORI CON I TUOI DATI REALI DI FIREBASE *
+// ********************************************************************************
+
+// 1. Configurazione Firebase (firebaseConfig):
+// Questi sono i dettagli specifici del tuo progetto Firebase.
+// Per trovarli:
+//   a. Vai alla Console Firebase: https://console.firebase.google.com/
+//   b. Seleziona il tuo progetto (o creane uno nuovo se non l'hai ancora fatto).
+//   c. Clicca sull'icona a forma di ingranaggio (Impostazioni progetto) accanto a "Panoramica del progetto".
+//   d. Scorri verso il basso fino alla sezione "Le tue app".
+//   e. Seleziona la tua app web (di solito è un'icona con "</>"). Se non hai un'app web, clicca su "Aggiungi app" e scegli l'icona web.
+//   f. Ti verrà mostrato un oggetto JavaScript simile a quello qui sotto. Copia i valori e incollali qui.
+
 const firebaseConfig = {
-  apiKey: "IL_TUO_API_KEY_QUI",
-  authDomain: "IL_TUO_AUTH_DOMAIN_QUI",
-  projectId: "IL_TUO_PROJECT_ID_QUI",
-  storageBucket: "IL_TUO_STORAGE_BUCKET_QUI",
-  messagingSenderId: "IL_TUO_MESSAGING_SENDER_ID_QUI",
-  appId: "IL_TUO_APP_ID_DI_FIREBASE_QUI" // Questo è l'appId di Firebase, non il nostro appId logico
+  apiKey: "AIzaSyAdjX8SY1xZPsdJmad8CH-nhKNsFUaMKPw",             // <-- INSERISCI QUI LA TUA API KEY (es. "AIzaSyC...")
+  authDomain: "spese-famiglia-casetta.firebaseapp.com",     // <-- INSERISCI QUI IL TUO AUTH DOMAIN (es. "tuo-progetto.firebaseapp.com")
+  projectId: "spese-famiglia-casetta",       // <-- INSERISCI QUI IL TUO PROJECT ID (es. "tuo-progetto-12345")
+  storageBucket: "spese-famiglia-casetta.firebasestorage.app", // <-- INSERISCI QUI IL TUO STORAGE BUCKET (es. "tuo-progetto-12345.appspot.com")
+  messagingSenderId: "1033593588036", // <-- INSERISCI QUI IL TUO MESSAGING SENDER ID
+  appId: "1:1033593588036:web:9aa23004bb8751458b2f11"    // <-- INSERISCI QUI L'APP ID SPECIFICO DI FIREBASE (es. "1:234567890:web:abcdef12345")
 };
 
-// Il tuo ID logico per l'applicazione (può essere una stringa a tua scelta, usala per la collezione Firestore)
-const appId = 'IL_TUO_APP_ID_UNICO_QUI'; // Esempio: 'spese-famiglia-rossi'
+// 2. ID Logico dell'Applicazione (appId):
+// Questa è una stringa che scegli tu per identificare la tua app all'interno della struttura di Firestore.
+// È il nome che useremo per la collezione dove verranno salvate le spese.
+// Deve essere una stringa unica e significativa per la tua famiglia (es. 'spese-famiglia-rossi', 'budget-mariogiovanna').
+// Non deve essere uguale all'appId di Firebase sopra, anche se puoi usare lo stesso valore se vuoi.
+const appId = 'spese-famiglia-casetta'; // <-- INSERISCI QUI IL TUO ID LOGICO UNICO (es. 'spese-famiglia-rossi')
+
+// ********************************************************************************
+// * FINE DELLE SOSTITUZIONI NECESSARIE *
+// ********************************************************************************
+
 
 function App() {
   const [db, setDb] = useState(null);
@@ -85,7 +107,7 @@ function App() {
         setAuth(firebaseAuth);
 
         // Su Firebase Hosting, useremo l'autenticazione anonima o altri metodi Firebase.
-        // Rimuoviamo la dipendenza da __initial_auth_token che è specifica dell'ambiente Canvas.
+        // Abbiamo rimosso la dipendenza da __initial_auth_token che è specifica dell'ambiente Canvas.
         await signInAnonymously(firebaseAuth);
         
         onAuthStateChanged(firebaseAuth, (user) => {
@@ -327,7 +349,7 @@ function App() {
     setLlmLoading(true);
     setLlmError(null);
     setLlmInsight(null);
-    setShowLlmInsight(true); 
+    setShowLlmInsight(true); // Always show section when generating
 
     const spendingDataSummary = {
       perpetualTotal: perpetualTotal.toFixed(2),
@@ -359,7 +381,7 @@ function App() {
       const chatHistory = [];
       chatHistory.push({ role: "user", parts: [{ text: prompt }] });
       const payload = { contents: chatHistory };
-      const apiKey = ""; 
+      const apiKey = ""; // If you want to use models other than gemini-2.5-flash-preview-05-20 or imagen-3.0-generate-002, provide an API key here. Otherwise, leave this as-is.
       const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
       const result = await retryFetch(apiUrl, {
