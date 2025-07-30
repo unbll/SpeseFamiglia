@@ -206,7 +206,8 @@ function App() {
 
     console.log("Fetching expenses for userId:", userId);
     // MODIFICA QUI: Ora le spese vengono lette da una collezione pubblica/condivisa
-    const expensesCollectionRef = collection(db, `artifacts/${appId}/public/expenses`);
+    // Il percorso è ora 'shared_data/{appId}/expenses'
+    const expensesCollectionRef = collection(db, 'shared_data', appId, 'expenses');
     const q = query(expensesCollectionRef);
 
     const unsubscribeFirestore = onSnapshot(q, (snapshot) => {
@@ -233,7 +234,8 @@ function App() {
     }
 
     // Anche i nomi della coppia sono ora in una collezione condivisa (non per utente specifico)
-    const settingsDocRef = doc(db, `artifacts/${appId}/settings/couple_names`);
+    // Il percorso è ora 'shared_data/{appId}/settings/couple_names'
+    const settingsDocRef = doc(db, 'shared_data', appId, 'settings', 'couple_names');
 
     const unsubscribeSettings = onSnapshot(settingsDocRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -264,7 +266,7 @@ function App() {
     try {
       setLoading(true); 
       // Anche il salvataggio dei nomi della coppia è ora nella collezione condivisa
-      const settingsDocRef = doc(db, `artifacts/${appId}/settings/couple_names`);
+      const settingsDocRef = doc(db, 'shared_data', appId, 'settings', 'couple_names');
       await setDoc(settingsDocRef, {
         user1Name: editingUserName1, 
         user2Name: editingUserName2  
@@ -512,7 +514,7 @@ function App() {
     try {
       setLoading(true);
       // MODIFICA QUI: La transazione di ripianamento va nella collezione pubblica
-      const expensesCollectionRef = collection(db, `artifacts/${appId}/public/expenses`);
+      const expensesCollectionRef = collection(db, 'shared_data', appId, 'expenses');
       await addDoc(expensesCollectionRef, {
         description: description,
         amount: settlementAmount,
@@ -603,7 +605,7 @@ function App() {
     try {
       setLoading(true);
       // MODIFICA QUI: Le spese vengono aggiunte alla collezione pubblica
-      const expensesCollectionRef = collection(db, `artifacts/${appId}/public/expenses`);
+      const expensesCollectionRef = collection(db, 'shared_data', appId, 'expenses');
       await addDoc(expensesCollectionRef, {
         description,
         amount: parseFloat(amount),
@@ -640,7 +642,7 @@ function App() {
     try {
       setLoading(true);
       // MODIFICA QUI: Le spese vengono eliminate dalla collezione pubblica
-      await deleteDoc(doc(db, `artifacts/${appId}/public/expenses`, expenseToDelete));
+      await deleteDoc(doc(db, 'shared_data', appId, 'expenses', expenseToDelete));
       setError(null);
       console.log("Expense deleted successfully.");
     } catch (e) {
