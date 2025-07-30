@@ -40,6 +40,11 @@ const firebaseConfig = {
 // Non deve essere uguale all'appId di Firebase sopra, anche se puoi usare lo stesso valore se vuoi.
 const appId = 'spese-famiglia-casetta'; // <-- INSERISCI QUI IL TUO ID LOGICO UNICO (es. 'spese-famiglia-rossi')
 
+// Costanti per i nomi utente predefiniti
+const DEFAULT_USER1_NAME = 'Io';
+const DEFAULT_USER2_NAME = 'La mia ragazza';
+const SETTLEMENT_CATEGORY = 'Saldo Ripianato'; // Nuova costante per la categoria di ripianamento
+
 // ********************************************************************************
 // * FINE DELLE SOSTITUZIONI NECESSARIE *
 // ********************************************************************************
@@ -58,11 +63,11 @@ function App() {
   const [category, setCategory] = useState('Casa'); // Default category
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [userName1, setUserName1] = useState('Io');
-  const [userName2, setUserName2] = useState('La mia ragazza');
+  const [userName1, setUserName1] = useState(DEFAULT_USER1_NAME);
+  const [userName2, setUserName2] = useState(DEFAULT_USER2_NAME);
   // Nuovi stati locali per la modifica dei nomi utente
-  const [editingUserName1, setEditingUserName1] = useState('Io');
-  const [editingUserName2, setEditingUserName2] = useState('La mia ragazza');
+  const [editingUserName1, setEditingUserName1] = useState(DEFAULT_USER1_NAME);
+  const [editingUserName2, setEditingUserName2] = useState(DEFAULT_USER2_NAME);
 
   const [showSettings, setShowSettings] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -70,7 +75,7 @@ function App() {
   const [showHistory, setShowHistory] = useState(false); 
   const [showMonthlyTable, setShowMonthlyTable] = useState(false);
   const [showAnnualTable, setShowAnnualTable] = useState(false);
-  const [showRecentExpenses, setShowRecentExpenses] = useState(false); 
+  const [showRecentExpenses, setShowRecentExpenses] = useState(false); // Rinominato in "Transazioni Recenti"
 
   // New states for user filters in tables/history
   const [monthlyFilterUser, setMonthlyFilterUser] = useState('Tutti');
@@ -92,6 +97,12 @@ function App() {
   // Stati per la gestione dell'espansione/collasso nello storico dettagliato
   const [expandedYears, setExpandedYears] = useState(new Set());
   const [expandedMonths, setExpandedMonths] = useState(new Set());
+
+  // Stati per l'inserimento manuale di mese e anno per le spese
+  const currentMonth = new Date().getMonth() + 1; // Mese corrente (1-12)
+  const currentYear = new Date().getFullYear(); // Anno corrente
+  const [expenseMonth, setExpenseMonth] = useState(currentMonth);
+  const [expenseYear, setExpenseYear] = useState(currentYear);
 
   // Funzioni per il toggle dell'espansione
   const toggleYear = (year) => {
@@ -118,6 +129,10 @@ function App() {
     });
   };
 
+  // Helper per identificare le spese di ripianamento
+  const isSettlementExpense = useCallback((expense) => {
+    return expense.category === SETTLEMENT_CATEGORY;
+  }, []);
 
   // Utility function for exponential backoff
   const retryFetch = async (url, options, retries = 3, delay = 1000) => {
@@ -203,11 +218,11 @@ function App() {
     const unsubscribeSettings = onSnapshot(settingsDocRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        setUserName1(data.user1Name || 'Io');
-        setUserName2(data.user2Name || 'La mia ragazza');
+        setUserName1(data.user1Name || DEFAULT_USER1_NAME);
+        setUserName2(data.user2Name || DEFAULT_USER2_NAME);
         // Aggiorna anche gli stati di editing quando i nomi globali cambiano (es. caricamento iniziale o aggiornamento da altro utente)
-        setEditingUserName1(data.user1Name || 'Io');
-        setEditingUserName2(data.user2Name || 'La mia ragazza');
+        setEditingUserName1(data.user1Name || DEFAULT_USER1_NAME);
+        setEditingUserName2(data.user2Name || DEFAULT_USER2_NAME);
         console.log("Couple names loaded from Firestore:", data);
       } else {
         console.log("Couple names document not found.");
@@ -221,18 +236,17 @@ function App() {
   }, [db, userId]); 
 
   // Function to save couple names to Firestore
-  // Questa funzione ora accetta i nomi come argomenti
-  const saveCoupleNames = useCallback(async () => { // Rimosso argomenti espliciti, userà editingUserName1/2
+  const saveCoupleNames = useCallback(async () => { 
     if (!db || !userId) {
-      setError("Database non disponibile o utente non autenticato."); // Reimposta l'errore qui per feedback immediato
+      setError("Database non disponibile o utente non autenticato."); 
       return;
     }
     try {
-      setLoading(true); // Mostra il caricamento solo al click del pulsante
+      setLoading(true); 
       const settingsDocRef = doc(db, `artifacts/${appId}/settings/couple_names`);
       await setDoc(settingsDocRef, {
-        user1Name: editingUserName1, // Usa i nomi dagli stati di editing
-        user2Name: editingUserName2  // Usa i nomi dagli stati di editing
+        user1Name: editingUserName1, 
+        user2Name: editingUserName2  
       }, { merge: true }); 
       setError(null); 
       console.log("Couple names saved successfully.");
@@ -240,13 +254,9 @@ function App() {
       console.error("Error saving couple names: ", e);
       setError("Errore nel salvataggio dei nomi della coppia. Riprova.");
     } finally {
-      setLoading(false); // Nascondi il caricamento
+      setLoading(false); 
     }
-  }, [db, userId, editingUserName1, editingUserName2]); // Dipendenze per useCallback
-
-  // Rimosso il useEffect precedente che chiamava saveCoupleNames con debounce.
-  // Ora il salvataggio è gestito direttamente dal pulsante.
-
+  }, [db, userId, editingUserName1, editingUserName2]); 
 
   // Process overall spending data (perpetual, monthly/annual averages, and by category)
   useEffect(() => {
@@ -257,6 +267,11 @@ function App() {
       const categoryTotals = {}; 
 
       expenses.forEach(expense => {
+        // Escludi le spese di ripianamento dai totali e dalle medie complessive
+        if (isSettlementExpense(expense)) {
+          return; 
+        }
+
         const date = expense.timestamp?.toDate();
         if (date) {
           const year = date.getFullYear();
@@ -280,14 +295,18 @@ function App() {
     };
 
     processOverallSpendingData();
-  }, [expenses]);
+  }, [expenses, isSettlementExpense]); 
 
   // Derived data for Monthly Spending Table (filtered by monthlyFilterUser)
   const filteredMonthlySpendingData = useMemo(() => {
     const monthlyTotals = {};
     expenses.forEach(expense => {
+      // Escludi le spese di ripianamento dalle tabelle di andamento
+      if (isSettlementExpense(expense)) {
+        return;
+      }
       const date = expense.timestamp?.toDate();
-      if (date && (monthlyFilterUser === 'Tutti' || expense.paidBy === monthlyFilterUser)) {
+      if (date && (monthlyFilterUser === 'Tutti' || getActualPayerForCalculation(expense.paidBy, userName1, userName2) === monthlyFilterUser)) {
         const year = date.getFullYear();
         const month = date.getMonth() + 1;
         const monthYear = `${year}-${String(month).padStart(2, '0')}`;
@@ -297,14 +316,18 @@ function App() {
     return Object.keys(monthlyTotals)
       .sort()
       .map(key => ({ name: key, total: monthlyTotals[key] }));
-  }, [expenses, monthlyFilterUser]);
+  }, [expenses, monthlyFilterUser, userName1, userName2, getActualPayerForCalculation, isSettlementExpense]);
 
   // Derived data for Annual Spending Table (filtered by annualFilterUser)
   const filteredAnnualSpendingData = useMemo(() => {
     const annualTotals = {};
     expenses.forEach(expense => {
+      // Escludi le spese di ripianamento dalle tabelle di andamento
+      if (isSettlementExpense(expense)) {
+        return;
+      }
       const date = expense.timestamp?.toDate();
-      if (date && (annualFilterUser === 'Tutti' || expense.paidBy === annualFilterUser)) {
+      if (date && (annualFilterUser === 'Tutti' || getActualPayerForCalculation(expense.paidBy, userName1, userName2) === annualFilterUser)) {
         const year = date.getFullYear();
         annualTotals[year] = (annualTotals[year] || 0) + expense.amount;
       }
@@ -312,14 +335,40 @@ function App() {
     return Object.keys(annualTotals)
       .sort()
       .map(key => ({ name: key, total: annualTotals[key] }));
-  }, [expenses, annualFilterUser]);
+  }, [expenses, annualFilterUser, userName1, userName2, getActualPayerForCalculation, isSettlementExpense]);
+
+  // Helper function to get the actual payer name for calculation purposes
+  const getActualPayerForCalculation = useCallback((paidByValue, currentUserName1, currentUserName2) => {
+    // Se il valore memorizzato corrisponde al nome corrente dell'utente 1
+    if (paidByValue === currentUserName1) return currentUserName1;
+    // Se il valore memorizzato corrisponde al nome corrente dell'utente 2
+    if (paidByValue === currentUserName2) return currentUserName2;
+
+    // Se il valore memorizzato è il nome predefinito dell'utente 1 ('Io')
+    // E il nome corrente dell'utente 1 è diverso dal predefinito,
+    // allora questa spesa è stata pagata dall'utente 1 (con il suo vecchio nome).
+    if (paidByValue === DEFAULT_USER1_NAME && currentUserName1 !== DEFAULT_USER1_NAME) return currentUserName1;
+    // Se il valore memorizzato è il nome predefinito dell'utente 2 ('La mia ragazza')
+    // E il nome corrente dell'utente 2 è diverso dal predefinito,
+    // allora questa spesa è stata pagata dall'utente 2 (con il suo vecchio nome).
+    if (paidByValue === DEFAULT_USER2_NAME && currentUserName2 !== DEFAULT_USER2_NAME) return currentUserName2;
+
+    // In tutti gli altri casi (es. il nome predefinito è ancora in uso, o è un nome personalizzato già presente),
+    // restituisci il valore memorizzato.
+    return paidByValue;
+  }, [userName1, userName2]); 
 
   // Derived data for Historical Spending Section (filtered by historyFilterUser)
   const filteredHistoricalData = useMemo(() => {
     const annualDataMap = {};
     expenses.forEach(expense => {
+      // Escludi le spese di ripianamento dallo storico dettagliato
+      if (isSettlementExpense(expense)) {
+        return;
+      }
+
       const date = expense.timestamp?.toDate();
-      if (date && (historyFilterUser === 'Tutti' || expense.paidBy === historyFilterUser)) {
+      if (date && (historyFilterUser === 'Tutti' || getActualPayerForCalculation(expense.paidBy, userName1, userName2) === historyFilterUser)) {
         const year = date.getFullYear();
         const month = date.getMonth() + 1;
         const monthYear = `${year}-${String(month).padStart(2, '0')}`;
@@ -350,25 +399,32 @@ function App() {
             expenses: annualDataMap[year].months[monthKey].expenses.sort((a, b) => (b.timestamp?.toDate() || 0) - (a.timestamp?.toDate() || 0)) 
           }))
       }));
-  }, [expenses, historyFilterUser]);
+  }, [expenses, historyFilterUser, userName1, userName2, getActualPayerForCalculation, isSettlementExpense]);
 
 
   // Calculate balance for current period
   const calculateBalance = useCallback(() => {
     let totalPaidBy1 = 0;
     let totalPaidBy2 = 0;
-    let totalOverallExpenses = 0;
+    let totalOverallExpensesForShare = 0; // Nuovo totale per la divisione equa
 
     expenses.forEach(expense => {
-      totalOverallExpenses += expense.amount;
-      if (expense.paidBy === userName1) {
+      const actualPayer = getActualPayerForCalculation(expense.paidBy, userName1, userName2);
+
+      // Le spese di ripianamento contano per i totali individuali pagati,
+      // ma non per il totale complessivo da dividere equamente.
+      if (!isSettlementExpense(expense)) {
+        totalOverallExpensesForShare += expense.amount;
+      }
+
+      if (actualPayer === userName1) {
         totalPaidBy1 += expense.amount;
-      } else if (expense.paidBy === userName2) {
+      } else if (actualPayer === userName2) {
         totalPaidBy2 += expense.amount;
       }
     });
 
-    const sharePerPerson = totalOverallExpenses / 2;
+    const sharePerPerson = totalOverallExpensesForShare / 2;
 
     const user1Net = totalPaidBy1 - sharePerPerson; 
     const user2Net = totalPaidBy2 - sharePerPerson; 
@@ -384,7 +440,7 @@ function App() {
       netBalance: user1Net, 
       summary: summary
     };
-  }, [expenses, userName1, userName2]);
+  }, [expenses, userName1, userName2, getActualPayerForCalculation, isSettlementExpense]); 
 
   const { netBalance, summary } = calculateBalance(); 
 
@@ -404,6 +460,7 @@ function App() {
     let payer = '';
     let description = '';
 
+    // Il ripianamento del saldo dovrebbe usare i nomi attuali
     if (netBalance > 0) { 
       payer = userName2;
       description = `Ripianamento saldo da ${userName2} a ${userName1}`;
@@ -418,8 +475,8 @@ function App() {
       await addDoc(expensesCollectionRef, {
         description: description,
         amount: settlementAmount,
-        paidBy: payer,
-        category: 'Saldo Ripianato', 
+        paidBy: payer, // Salva il nome corrente per il ripianamento
+        category: SETTLEMENT_CATEGORY, // Usa la costante per la categoria
         timestamp: new Date()
       });
       setError(null);
@@ -437,7 +494,7 @@ function App() {
     setLlmLoading(true);
     setErrorLlm(null); 
     setLlmInsight(null);
-    setShowLlmInsight(true); // Always show section when generating
+    setShowLlmInsight(true); 
 
     const spendingDataSummary = {
       perpetualTotal: perpetualTotal.toFixed(2),
@@ -469,7 +526,7 @@ function App() {
       const chatHistory = [];
       chatHistory.push({ role: "user", parts: [{ text: prompt }] });
       const payload = { contents: chatHistory };
-      const apiKey = ""; // If you want to use models other than gemini-2.5-flash-preview-05-20 or imagen-3.0-generate-002, provide an API key here. Otherwise, leave this as-is.
+      const apiKey = ""; 
       const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
       const result = await retryFetch(apiUrl, {
@@ -501,6 +558,10 @@ function App() {
       return;
     }
 
+    // Crea un oggetto Date con il mese e l'anno selezionati (il mese è 0-based in Date)
+    // Usiamo il giorno 15 per evitare problemi con i mesi che hanno meno di 31 giorni
+    const selectedDate = new Date(expenseYear, expenseMonth - 1, 15);
+
     try {
       setLoading(true);
       const expensesCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/expenses`);
@@ -509,10 +570,13 @@ function App() {
         amount: parseFloat(amount),
         paidBy,
         category,
-        timestamp: new Date()
+        timestamp: selectedDate // Usa la data selezionata
       });
       setDescription('');
       setAmount('');
+      // Reimposta il mese e l'anno ai valori correnti dopo l'aggiunta
+      setExpenseMonth(currentMonth);
+      setExpenseYear(currentYear);
       setError(null);
       console.log("Expense added successfully.");
     } catch (e) {
@@ -588,24 +652,33 @@ function App() {
   };
 
   // Categories and Payer options
-  const categories = ['Casa', 'Cibo', 'Svago', 'Trasporti', 'Salute', 'Altro', 'Saldo Ripianato']; 
+  const categories = ['Casa', 'Cibo', 'Svago', 'Trasporti', 'Salute', 'Altro', SETTLEMENT_CATEGORY]; 
 
   // Helper to format month name
-  const getMonthName = (monthYear) => {
-    const [year, month] = monthYear.split('-');
-    const date = new Date(year, parseInt(month) - 1);
+  const getMonthName = (monthNumber) => {
+    const date = new Date(currentYear, monthNumber - 1); // Usa un anno qualsiasi, solo per il nome del mese
     return date.toLocaleString('it-IT', { month: 'long' });
   };
 
   // Helper function to get the display name for 'paidBy'
   const getDisplayName = useCallback((paidByValue) => {
-    if (paidByValue === 'Io') {
+    if (paidByValue === DEFAULT_USER1_NAME) {
       return userName1;
-    } else if (paidByValue === 'La mia ragazza') {
+    } else if (paidByValue === DEFAULT_USER2_NAME) {
       return userName2;
     }
-    return paidByValue; // Return as is if it's already a custom name
-  }, [userName1, userName2]); // Dipendenze per useCallback
+    return paidByValue; 
+  }, [userName1, userName2]); 
+
+  // Genera un array di anni per il dropdown
+  const years = useMemo(() => {
+    const startYear = currentYear - 5; // Ultimi 5 anni + corrente
+    const yearsArray = [];
+    for (let i = currentYear; i >= startYear; i--) {
+      yearsArray.push(i);
+    }
+    return yearsArray;
+  }, [currentYear]);
 
   if (loading) {
     return (
@@ -742,6 +815,33 @@ function App() {
                     ))}
                   </select>
                 </div>
+                {/* Nuovi campi per Mese e Anno */}
+                <div>
+                  <label htmlFor="expenseMonth" className="block text-gray-300 text-sm font-medium mb-1">Mese</label>
+                  <select
+                    id="expenseMonth"
+                    className="w-full p-3 rounded-lg bg-zinc-900 border border-zinc-700 focus:ring-purple-500 focus:border-purple-500 text-gray-100"
+                    value={expenseMonth}
+                    onChange={(e) => setExpenseMonth(parseInt(e.target.value))}
+                  >
+                    {[...Array(12).keys()].map(i => (
+                      <option key={i + 1} value={i + 1}>{getMonthName(i + 1)}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="expenseYear" className="block text-gray-300 text-sm font-medium mb-1">Anno</label>
+                  <select
+                    id="expenseYear"
+                    className="w-full p-3 rounded-lg bg-zinc-900 border border-zinc-700 focus:ring-purple-500 focus:border-purple-500 text-gray-100"
+                    value={expenseYear}
+                    onChange={(e) => setExpenseYear(parseInt(e.target.value))}
+                  >
+                    {years.map(year => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <button
                 onClick={addExpense}
@@ -843,7 +943,7 @@ function App() {
                           <tbody className="text-gray-200 text-sm font-light">
                             {filteredMonthlySpendingData.map((data, index) => (
                               <tr key={index} className="border-b border-zinc-600 hover:bg-zinc-700">
-                                <td className="py-3 px-6 text-left whitespace-nowrap">{getMonthName(data.name)} {data.name.split('-')[0]}</td>
+                                <td className="py-3 px-6 text-left whitespace-nowrap">{getMonthName(parseInt(data.name.split('-')[1]))} {data.name.split('-')[0]}</td>
                                 <td className="py-3 px-6 text-right">{data.total.toFixed(2)}€</td>
                               </tr>
                             ))}
@@ -958,7 +1058,7 @@ function App() {
                                     className="bg-zinc-700 p-3 rounded-md cursor-pointer hover:bg-zinc-600 transition duration-200"
                                     onClick={(e) => { e.stopPropagation(); toggleMonth(monthData.name); }}>
                                   <div className="flex justify-between items-center">
-                                    <p className="font-semibold text-gray-100">{getMonthName(monthData.name)}: {monthData.total.toFixed(2)}€</p>
+                                    <p className="font-semibold text-gray-100">{getMonthName(parseInt(monthData.name.split('-')[1]))}: {monthData.total.toFixed(2)}€</p>
                                     <svg
                                       xmlns="http://www.w3.org/2000/svg"
                                       className={`h-4 w-4 text-gray-400 transform transition-transform duration-200 ${
@@ -994,21 +1094,21 @@ function App() {
               )}
             </div>
 
-            {/* Expense List - Now with consistent styling */}
+            {/* Transaction Log Section */}
             <div className="mb-8 p-6 bg-zinc-700 rounded-xl shadow-inner">
               <button
                 onClick={() => setShowRecentExpenses(!showRecentExpenses)}
                 className="w-full bg-zinc-600 hover:bg-zinc-500 text-gray-200 font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out shadow-md"
               >
-                {showRecentExpenses ? 'Nascondi Spese Recenti' : 'Mostra Spese Recenti'}
+                {showRecentExpenses ? 'Nascondi Transazioni Recenti' : 'Mostra Transazioni Recenti'}
               </button>
               {showRecentExpenses && (
                 <div className="mt-4"> 
-                  <h2 className="text-2xl font-semibold text-purple-300 mb-4">Spese Recenti</h2>
+                  <h2 className="text-2xl font-semibold text-purple-300 mb-4">Transazioni Recenti</h2>
                   {expenses.length === 0 ? (
-                    <p className="text-gray-400 text-center">Nessuna spesa aggiunta ancora.</p>
+                    <p className="text-gray-400 text-center">Nessuna transazione aggiunta ancora.</p>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="max-h-96 overflow-y-auto space-y-3 pr-2"> {/* Aggiunto max-h e overflow-y */}
                       {expenses.map(expense => (
                         <div key={expense.id} className="flex justify-between items-center bg-zinc-800 p-4 rounded-lg shadow-sm">
                           <div>
@@ -1058,9 +1158,8 @@ function App() {
                         type="text"
                         id="userName1"
                         className="w-full p-3 rounded-lg bg-zinc-900 border border-zinc-700 focus:ring-purple-500 focus:border-purple-500 text-gray-100"
-                        value={editingUserName1} // Usa lo stato di editing locale
-                        onChange={(e) => setEditingUserName1(e.target.value)} // Aggiorna lo stato di editing locale
-                        // Rimosso onBlur per consentire la digitazione libera
+                        value={editingUserName1} 
+                        onChange={(e) => setEditingUserName1(e.target.value)} 
                       />
                     </div>
                     <div>
@@ -1069,9 +1168,8 @@ function App() {
                         type="text"
                         id="userName2"
                         className="w-full p-3 rounded-lg bg-zinc-900 border border-zinc-700 focus:ring-purple-500 focus:border-purple-500 text-gray-100"
-                        value={editingUserName2} // Usa lo stato di editing locale
-                        onChange={(e) => setEditingUserName2(e.target.value)} // Aggiorna lo stato di editing locale
-                        // Rimosso onBlur per consentire la digitazione libera
+                        value={editingUserName2} 
+                        onChange={(e) => setEditingUserName2(e.target.value)} 
                       />
                     </div>
                   </div>
@@ -1079,7 +1177,7 @@ function App() {
                     I nomi utente vengono utilizzati per i calcoli del saldo.
                   </p>
                   <button
-                    onClick={saveCoupleNames} // Chiama la funzione di salvataggio esplicitamente
+                    onClick={saveCoupleNames} 
                     className="w-full mt-4 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 ease-in-out shadow-md hover:shadow-lg"
                   >
                     Salva Nomi
