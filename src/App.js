@@ -8,6 +8,8 @@ import {
   onAuthStateChanged 
 } from 'firebase/auth';
 import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, setDoc } from 'firebase/firestore'; 
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+
 
 // ********************************************************************************
 // * PASSO FONDAMENTALE: SOSTITUISCI QUESTI VALORI CON I TUOI DATI REALI DI FIREBASE *
@@ -320,45 +322,69 @@ function App() {
     processOverallSpendingData();
   }, [expenses, isSettlementExpense]); 
 
-  // Derived data for Monthly Spending Table (filtered by monthlyFilterUser)
+  // Derived data for Monthly Spending Chart (filtered by monthlyFilterUser)
   const filteredMonthlySpendingData = useMemo(() => {
     const monthlyTotals = {};
-    expenses.forEach(expense => {
-      // Escludi le spese di ripianamento dalle tabelle di andamento
-      if (isSettlementExpense(expense)) {
-        return;
-      }
+    const filteredExpenses = expenses.filter(expense => {
+      // Exclude settlement expenses AND apply user filter
+      return !isSettlementExpense(expense) &&
+             (monthlyFilterUser === 'Tutti' || getActualPayerForCalculation(expense.paidBy, userName1, userName2) === monthlyFilterUser);
+    });
+
+    filteredExpenses.forEach(expense => {
       const date = expense.timestamp?.toDate();
-      if (date && (monthlyFilterUser === 'Tutti' || getActualPayerForCalculation(expense.paidBy, userName1, userName2) === monthlyFilterUser)) {
+      if (date) {
         const year = date.getFullYear();
         const month = date.getMonth() + 1;
         const monthYear = `${year}-${String(month).padStart(2, '0')}`;
         monthlyTotals[monthYear] = (monthlyTotals[monthYear] || 0) + expense.amount;
       }
     });
-    return Object.keys(monthlyTotals)
+
+    const dataPoints = Object.keys(monthlyTotals)
       .sort()
       .map(key => ({ name: key, total: monthlyTotals[key] }));
-  }, [expenses, monthlyFilterUser, userName1, userName2, isSettlementExpense]); // getActualPayerForCalculation non è più una dipendenza qui
 
-  // Derived data for Annual Spending Table (filtered by annualFilterUser)
+    // Calculate average for the *filtered* monthly data
+    const totalSumOfFilteredMonths = dataPoints.reduce((acc, curr) => acc + curr.total, 0);
+    const averageOfFilteredMonths = dataPoints.length > 0 ? totalSumOfFilteredMonths / dataPoints.length : 0;
+
+    return dataPoints.map(item => ({
+      ...item,
+      average: averageOfFilteredMonths // Add the calculated average to each data point
+    }));
+  }, [expenses, monthlyFilterUser, userName1, userName2, isSettlementExpense]);
+
+  // Derived data for Annual Spending Chart (filtered by annualFilterUser)
   const filteredAnnualSpendingData = useMemo(() => {
     const annualTotals = {};
-    expenses.forEach(expense => {
-      // Escludi le spese di ripianamento dalle tabelle di andamento
-      if (isSettlementExpense(expense)) {
-        return;
-      }
+    const filteredExpenses = expenses.filter(expense => {
+      // Exclude settlement expenses AND apply user filter
+      return !isSettlementExpense(expense) &&
+             (annualFilterUser === 'Tutti' || getActualPayerForCalculation(expense.paidBy, userName1, userName2) === annualFilterUser);
+    });
+
+    filteredExpenses.forEach(expense => {
       const date = expense.timestamp?.toDate();
-      if (date && (annualFilterUser === 'Tutti' || getActualPayerForCalculation(expense.paidBy, userName1, userName2) === annualFilterUser)) {
+      if (date) {
         const year = date.getFullYear();
         annualTotals[year] = (annualTotals[year] || 0) + expense.amount;
       }
     });
-    return Object.keys(annualTotals)
+
+    const dataPoints = Object.keys(annualTotals)
       .sort()
       .map(key => ({ name: key, total: annualTotals[key] }));
-  }, [expenses, annualFilterUser, userName1, userName2, isSettlementExpense]); // getActualPayerForCalculation non è più una dipendenza qui
+
+    // Calculate average for the *filtered* annual data
+    const totalSumOfFilteredYears = dataPoints.reduce((acc, curr) => acc + curr.total, 0);
+    const averageOfFilteredYears = dataPoints.length > 0 ? totalSumOfFilteredYears / dataPoints.length : 0;
+
+    return dataPoints.map(item => ({
+      ...item,
+      average: averageOfFilteredYears // Add the calculated average to each data point
+    }));
+  }, [expenses, annualFilterUser, userName1, userName2, isSettlementExpense]);
 
   // Derived data for Historical Spending Section (filtered by historyFilterUser)
   const filteredHistoricalData = useMemo(() => {
@@ -401,7 +427,7 @@ function App() {
             expenses: annualDataMap[year].months[monthKey].expenses.sort((a, b) => (b.timestamp?.toDate() || 0) - (a.timestamp?.toDate() || 0)) 
           }))
       }));
-  }, [expenses, historyFilterUser, userName1, userName2, isSettlementExpense]); // getActualPayerForCalculation non è più una dipendenza qui
+  }, [expenses, historyFilterUser, userName1, userName2, isSettlementExpense]); 
 
 
   // Calculate balance for current period
@@ -417,12 +443,23 @@ function App() {
       // ma non per il totale complessivo da dividere equamente.
       if (!isSettlementExpense(expense)) {
         totalOverallExpensesForShare += expense.amount;
-      }
-
-      if (actualPayer === userName1) {
-        totalPaidBy1 += expense.amount;
-      } else if (actualPayer === userName2) {
-        totalPaidBy2 += expense.amount;
+        if (actualPayer === userName1) {
+          totalPaidBy1 += expense.amount;
+        } else if (actualPayer === userName2) {
+          totalPaidBy2 += expense.amount;
+        }
+      } else {
+        // Questa è una spesa di ripianamento. Rappresenta un trasferimento diretto.
+        // Deve aggiustare i totali individuali *senza* influenzare le spese condivise complessive.
+        // Se expense.paidBy è userName2 (quindi userName2 ha pagato userName1),
+        // il contributo di userName2 aumenta e quello di userName1 diminuisce.
+        if (expense.paidBy === userName2) { 
+          totalPaidBy2 += expense.amount; 
+          totalPaidBy1 -= expense.amount; 
+        } else if (expense.paidBy === userName1) { 
+          totalPaidBy1 += expense.amount; 
+          totalPaidBy2 -= expense.amount; 
+        }
       }
     });
 
@@ -432,17 +469,20 @@ function App() {
     const user2Net = totalPaidBy2 - sharePerPerson; 
 
     let summary = 'Siete in pari!';
-    if (user1Net > 0.01) { 
-      summary = `${userName2} deve dare ${userName1} ${Math.abs(user1Net).toFixed(2)}€`;
-    } else if (user2Net > 0.01) { 
-      summary = `${userName1} deve dare ${userName2} ${Math.abs(user2Net).toFixed(2)}€`;
+    // Usa un piccolo epsilon per il confronto con i numeri floating point
+    if (Math.abs(user1Net) < 0.01) { // Se il saldo è effettivamente zero
+        summary = 'Siete in pari!';
+    } else if (user1Net > 0) { 
+        summary = `${userName2} deve dare ${userName1} ${Math.abs(user1Net).toFixed(2)}€`;
+    } else { // user1Net < 0
+        summary = `${userName1} deve dare ${userName2} ${Math.abs(user1Net).toFixed(2)}€`;
     }
 
     return {
       netBalance: user1Net, 
       summary: summary
     };
-  }, [expenses, userName1, userName2, isSettlementExpense]); // getActualPayerForCalculation non è più una dipendenza qui
+  }, [expenses, userName1, userName2, isSettlementExpense, getActualPayerForCalculation]); 
 
   const { netBalance, summary } = calculateBalance(); 
 
@@ -503,6 +543,7 @@ function App() {
       monthlyAverage: monthlyAverage.toFixed(2),
       annualAverage: annualAverage.toFixed(2),
       spendingByCategory: Object.entries(spendingByCategory).map(([cat, val]) => ({ category: cat, total: val.toFixed(2) })),
+      // Per i prompt LLM, usiamo i dati aggregati globali (non filtrati per utente)
       monthlyTrends: filteredMonthlySpendingData.map(data => ({ month: `${getMonthName(parseInt(data.name.split('-')[1]))} ${data.name.split('-')[0]}`, total: data.total.toFixed(2) })),
       annualTrends: filteredAnnualSpendingData.map(data => ({ year: data.name, total: data.total.toFixed(2) }))
     };
@@ -906,17 +947,17 @@ function App() {
               )}
             </div>
 
-            {/* Spending Trends Tables */}
+            {/* Spending Trends Charts */}
             <div className="mb-8 p-6 bg-zinc-700 rounded-xl shadow-inner">
-              <h2 className="text-2xl font-semibold text-purple-300 mb-4">Andamento Spese (Tabelle)</h2>
+              <h2 className="text-2xl font-semibold text-purple-300 mb-4">Andamento Spese</h2>
 
-              {/* Monthly Spending Table */}
+              {/* Monthly Spending Chart */}
               <div className="mb-6">
                 <button
                   onClick={() => setShowMonthlyTable(!showMonthlyTable)}
                   className="w-full bg-zinc-600 hover:bg-zinc-500 text-gray-200 font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out shadow-md"
                 >
-                  {showMonthlyTable ? 'Nascondi Tabella Mensile' : 'Mostra Tabella Mensile'}
+                  {showMonthlyTable ? 'Nascondi Grafico Mensile' : 'Mostra Grafico Mensile'}
                 </button>
                 {showMonthlyTable && (
                   <>
@@ -934,23 +975,31 @@ function App() {
                       </select>
                     </div>
                     {filteredMonthlySpendingData.length > 0 ? (
-                      <div className="mt-4 overflow-x-auto">
-                        <table className="min-w-full bg-zinc-800 rounded-lg shadow-md">
-                          <thead>
-                            <tr className="bg-zinc-700 text-gray-300 uppercase text-sm leading-normal">
-                              <th className="py-3 px-6 text-left rounded-tl-lg">Mese</th>
-                              <th className="py-3 px-6 text-right rounded-tr-lg">Totale Speso (€)</th>
-                            </tr>
-                          </thead>
-                          <tbody className="text-gray-200 text-sm font-light">
-                            {filteredMonthlySpendingData.map((data, index) => (
-                              <tr key={index} className="border-b border-zinc-600 hover:bg-zinc-700">
-                                <td className="py-3 px-6 text-left whitespace-nowrap">{getMonthName(parseInt(data.name.split('-')[1]))} {data.name.split('-')[0]}</td>
-                                <td className="py-3 px-6 text-right">{data.total.toFixed(2)}€</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                      <div className="mt-4" style={{ width: '100%', height: 300 }}>
+                        <ResponsiveContainer>
+                          <LineChart
+                            data={filteredMonthlySpendingData}
+                            margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" stroke="#4a4a4a" />
+                            <XAxis
+                              dataKey="name"
+                              tickFormatter={(tick) => getMonthName(parseInt(tick.split('-')[1])) + ' ' + tick.split('-')[0]}
+                              stroke="#ccc"
+                              tick={{ fill: '#ccc' }}
+                            />
+                            <YAxis stroke="#ccc" tick={{ fill: '#ccc' }} />
+                            <Tooltip
+                              formatter={(value, name) => [`${value.toFixed(2)}€`, name === 'total' ? 'Spesa Totale' : 'Media']}
+                              labelFormatter={(label) => getMonthName(parseInt(label.split('-')[1])) + ' ' + label.split('-')[0]}
+                              contentStyle={{ backgroundColor: '#333', border: 'none', borderRadius: '8px' }}
+                              itemStyle={{ color: '#fff' }}
+                            />
+                            <Legend wrapperStyle={{ paddingTop: '10px', color: '#ccc' }} />
+                            <Line type="monotone" dataKey="total" stroke="#8884d8" activeDot={{ r: 8 }} name="Spesa Mensile" />
+                            <Line type="monotone" dataKey="average" stroke="#82ca9d" name="Media Mensile" dot={false} strokeDasharray="5 5" />
+                          </LineChart>
+                        </ResponsiveContainer>
                       </div>
                     ) : (
                       <p className="text-gray-400 text-center mt-4">Nessuna spesa disponibile per la selezione corrente.</p>
@@ -959,13 +1008,13 @@ function App() {
                 )}
               </div>
 
-              {/* Annual Spending Table */}
+              {/* Annual Spending Chart */}
               <div>
                 <button
                   onClick={() => setShowAnnualTable(!showAnnualTable)}
                   className="w-full bg-zinc-600 hover:bg-zinc-500 text-gray-200 font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out shadow-md"
                 >
-                  {showAnnualTable ? 'Nascondi Tabella Annuale' : 'Mostra Tabella Annuale'}
+                  {showAnnualTable ? 'Nascondi Grafico Annuale' : 'Mostra Grafico Annuale'}
                 </button>
                 {showAnnualTable && (
                   <>
@@ -983,23 +1032,26 @@ function App() {
                       </select>
                     </div>
                     {filteredAnnualSpendingData.length > 0 ? (
-                      <div className="mt-4 overflow-x-auto">
-                        <table className="min-w-full bg-zinc-800 rounded-lg shadow-md">
-                          <thead>
-                            <tr className="bg-zinc-700 text-gray-300 uppercase text-sm leading-normal">
-                              <th className="py-3 px-6 text-left rounded-tl-lg">Anno</th>
-                              <th className="py-3 px-6 text-right rounded-tr-lg">Totale Speso (€)</th>
-                            </tr>
-                          </thead>
-                          <tbody className="text-gray-200 text-sm font-light">
-                            {filteredAnnualSpendingData.map((data, index) => (
-                              <tr key={index} className="border-b border-zinc-600 hover:bg-zinc-700">
-                                <td className="py-3 px-6 text-left whitespace-nowrap">{data.name}</td>
-                                <td className="py-3 px-6 text-right">{data.total.toFixed(2)}€</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                      <div className="mt-4" style={{ width: '100%', height: 300 }}>
+                        <ResponsiveContainer>
+                          <LineChart
+                            data={filteredAnnualSpendingData}
+                            margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" stroke="#4a4a4a" />
+                            <XAxis dataKey="name" stroke="#ccc" tick={{ fill: '#ccc' }} />
+                            <YAxis stroke="#ccc" tick={{ fill: '#ccc' }} />
+                            <Tooltip
+                              formatter={(value, name) => [`${value.toFixed(2)}€`, name === 'total' ? 'Spesa Totale' : 'Media']}
+                              labelFormatter={(label) => `Anno ${label}`}
+                              contentStyle={{ backgroundColor: '#333', border: 'none', borderRadius: '8px' }}
+                              itemStyle={{ color: '#fff' }}
+                            />
+                            <Legend wrapperStyle={{ paddingTop: '10px', color: '#ccc' }} />
+                            <Line type="monotone" dataKey="total" stroke="#8884d8" activeDot={{ r: 8 }} name="Spesa Annuale" />
+                            <Line type="monotone" dataKey="average" stroke="#82ca9d" name="Media Annuale" dot={false} strokeDasharray="5 5" />
+                          </LineChart>
+                        </ResponsiveContainer>
                       </div>
                     ) : (
                       <p className="text-gray-400 text-center mt-4">Nessuna spesa disponibile per la selezione corrente.</p>
@@ -1190,6 +1242,11 @@ function App() {
           </>
         )}
       </div>
+
+      {/* Copyright Footer */}
+      <footer className="w-full max-w-3xl text-center text-gray-500 text-xs mt-8 p-4">
+        <p>© 2025 App pensata e creata da Andrea 'unbll' Marsili. Tutti i diritti riservati.</p>
+      </footer>
 
       {/* Confirmation Modal */}
       {showConfirmModal && (
