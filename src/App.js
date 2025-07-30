@@ -2,12 +2,12 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
-  createUserWithEmailAndPassword, // Mantenuto per riferimento, ma non usato nell'interfaccia
+  // createUserWithEmailAndPassword, // Rimosso perché la funzione handleSignUp non è più utilizzata
   signInWithEmailAndPassword, 
   signOut, 
   onAuthStateChanged 
 } from 'firebase/auth';
-import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, setDoc } from 'firebase/firestore'; // Aggiunto setDoc
+import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, setDoc } from 'firebase/firestore'; 
 
 // ********************************************************************************
 // * PASSO FONDAMENTALE: SOSTITUISCI QUESTI VALORI CON I TUOI DATI REALI DI FIREBASE *
@@ -155,9 +155,6 @@ function App() {
       setError("Errore nel caricamento delle spese. Riprova. Controlla i permessi di Firestore.");
     });
 
-    // Rimosso 'appId' dall'array di dipendenze.
-    // 'appId' è una costante definita fuori dal componente e non cambierà,
-    // quindi non è necessario includerla qui.
     return () => unsubscribeFirestore();
   }, [db, userId]); 
 
@@ -178,18 +175,19 @@ function App() {
       } else {
         // If document doesn't exist, save default names
         console.log("Couple names document not found, saving defaults.");
-        setDoc(settingsDocRef, {
-          user1Name: userName1,
-          user2Name: userName2
-        }, { merge: true }).catch(e => console.error("Error saving default couple names:", e));
+        // Non chiamiamo setDoc qui per evitare un loop infinito o scritture non necessarie
+        // La funzione saveCoupleNames è chiamata dal useEffect sottostante quando userName1/2 cambiano.
       }
     }, (err) => {
       console.error("Error fetching couple names settings:", err);
       setError("Errore nel caricamento dei nomi della coppia. Riprova.");
     });
 
+    // Aggiunti userName1 e userName2 alle dipendenze per garantire che il listener
+    // si aggiorni se i valori iniziali di default cambiano prima del caricamento da Firestore.
+    // Anche se sono di "outer scope", qui influenzano il comportamento iniziale.
     return () => unsubscribeSettings();
-  }, [db, userId, appId]); // Depend on db, userId, and appId
+  }, [db, userId, appId, userName1, userName2]); // Correzione: Aggiunte userName1 e userName2
 
   // Function to save couple names to Firestore
   const saveCoupleNames = useCallback(async () => {
@@ -212,7 +210,8 @@ function App() {
     } finally {
       setLoading(false);
     }
-  }, [db, userId, appId, userName1, userName2]); // Dipendenze per useCallback
+  }, [db, userId, userName1, userName2]); // Correzione: Rimosso appId, è una costante esterna
+
 
   // Call saveCoupleNames whenever userName1 or userName2 change
   useEffect(() => {
@@ -222,7 +221,7 @@ function App() {
       }, 500); // Debounce per evitare scritture eccessive
       return () => clearTimeout(handler);
     }
-  }, [userName1, userName2, db, userId, saveCoupleNames]); // Aggiunto saveCoupleNames alle dipendenze
+  }, [userName1, userName2, db, userId, saveCoupleNames]); 
 
 
   // Process overall spending data (perpetual, monthly/annual averages, and by category)
@@ -520,7 +519,6 @@ function App() {
       console.log("Expense deleted successfully.");
     } catch (e) {
       console.error("Error deleting document: ", e);
-      // CORREZIONE: Stringa interrotta completata
       setError("Errore nell'eliminazione della spesa. Riprova.");
     } finally {
       setLoading(false);
@@ -529,25 +527,26 @@ function App() {
     }
   };
 
-  // Handle user sign-up (Questa funzione non è più chiamata nell'interfaccia)
-  const handleSignUp = async () => {
-    if (!email || !password) {
-      setError("Per favore, inserisci email e password.");
-      return;
-    }
-    try {
-      setLoading(true);
-      const authInstance = getAuth();
-      await createUserWithEmailAndPassword(authInstance, email, password);
-      setError(null);
-      alert("Registrazione avvenuta con successo! Ora puoi accedere."); // Usa un alert temporaneo per feedback
-    } catch (e) {
-      console.error("Error signing up:", e);
-      setError(`Errore durante la registrazione: ${e.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // handleSignUp non è più utilizzata nell'interfaccia utente, quindi può essere rimossa
+  // o commentata per evitare avvisi di ESLint.
+  // const handleSignUp = async () => {
+  //   if (!email || !password) {
+  //     setError("Per favore, inserisci email e password.");
+  //     return;
+  //   }
+  //   try {
+  //     setLoading(true);
+  //     const authInstance = getAuth();
+  //     await createUserWithEmailAndPassword(authInstance, email, password);
+  //     setError(null);
+  //     alert("Registrazione avvenuta con successo! Ora puoi accedere.");
+  //   } catch (e) {
+  //     console.error("Error signing up:", e);
+  //     setError(`Errore durante la registrazione: ${e.message}`);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   // Handle user sign-in
   const handleSignIn = async () => {
