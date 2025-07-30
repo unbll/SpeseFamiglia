@@ -134,6 +134,29 @@ function App() {
     return expense.category === SETTLEMENT_CATEGORY;
   }, []);
 
+  // Helper function to get the actual payer name for calculation purposes
+  // Questa funzione è ora una normale funzione 'const' e non un useCallback
+  // Non ha bisogno di dipendenze perché usa solo i suoi parametri e costanti globali.
+  const getActualPayerForCalculation = (paidByValue, currentUserName1, currentUserName2) => {
+    // Se il valore memorizzato corrisponde al nome corrente dell'utente 1
+    if (paidByValue === currentUserName1) return currentUserName1;
+    // Se il valore memorizzato corrisponde al nome corrente dell'utente 2
+    if (paidByValue === currentUserName2) return currentUserName2;
+
+    // Se il valore memorizzato è il nome predefinito dell'utente 1 ('Io')
+    // E il nome corrente dell'utente 1 è diverso dal predefinito,
+    // allora questa spesa è stata pagata dall'utente 1 (con il suo vecchio nome).
+    if (paidByValue === DEFAULT_USER1_NAME && currentUserName1 !== DEFAULT_USER1_NAME) return currentUserName1;
+    // Se il valore memorizzato è il nome predefinito dell'utente 2 ('La mia ragazza')
+    // E il nome corrente dell'utente 2 è diverso dal predefinito,
+    // allora questa spesa è stata pagata dall'utente 2 (con il suo vecchio nome).
+    if (paidByValue === DEFAULT_USER2_NAME && currentUserName2 !== DEFAULT_USER2_NAME) return currentUserName2;
+
+    // In tutti gli altri casi (es. il nome predefinito è ancora in uso, o è un nome personalizzato già presente),
+    // restituisci il valore memorizzato.
+    return paidByValue;
+  };
+
   // Utility function for exponential backoff
   const retryFetch = async (url, options, retries = 3, delay = 1000) => {
     try {
@@ -316,7 +339,7 @@ function App() {
     return Object.keys(monthlyTotals)
       .sort()
       .map(key => ({ name: key, total: monthlyTotals[key] }));
-  }, [expenses, monthlyFilterUser, userName1, userName2, getActualPayerForCalculation, isSettlementExpense]);
+  }, [expenses, monthlyFilterUser, userName1, userName2, isSettlementExpense]); // getActualPayerForCalculation non è più una dipendenza qui
 
   // Derived data for Annual Spending Table (filtered by annualFilterUser)
   const filteredAnnualSpendingData = useMemo(() => {
@@ -335,28 +358,7 @@ function App() {
     return Object.keys(annualTotals)
       .sort()
       .map(key => ({ name: key, total: annualTotals[key] }));
-  }, [expenses, annualFilterUser, userName1, userName2, getActualPayerForCalculation, isSettlementExpense]);
-
-  // Helper function to get the actual payer name for calculation purposes
-  const getActualPayerForCalculation = useCallback((paidByValue, currentUserName1, currentUserName2) => {
-    // Se il valore memorizzato corrisponde al nome corrente dell'utente 1
-    if (paidByValue === currentUserName1) return currentUserName1;
-    // Se il valore memorizzato corrisponde al nome corrente dell'utente 2
-    if (paidByValue === currentUserName2) return currentUserName2;
-
-    // Se il valore memorizzato è il nome predefinito dell'utente 1 ('Io')
-    // E il nome corrente dell'utente 1 è diverso dal predefinito,
-    // allora questa spesa è stata pagata dall'utente 1 (con il suo vecchio nome).
-    if (paidByValue === DEFAULT_USER1_NAME && currentUserName1 !== DEFAULT_USER1_NAME) return currentUserName1;
-    // Se il valore memorizzato è il nome predefinito dell'utente 2 ('La mia ragazza')
-    // E il nome corrente dell'utente 2 è diverso dal predefinito,
-    // allora questa spesa è stata pagata dall'utente 2 (con il suo vecchio nome).
-    if (paidByValue === DEFAULT_USER2_NAME && currentUserName2 !== DEFAULT_USER2_NAME) return currentUserName2;
-
-    // In tutti gli altri casi (es. il nome predefinito è ancora in uso, o è un nome personalizzato già presente),
-    // restituisci il valore memorizzato.
-    return paidByValue;
-  }, [userName1, userName2]); 
+  }, [expenses, annualFilterUser, userName1, userName2, isSettlementExpense]); // getActualPayerForCalculation non è più una dipendenza qui
 
   // Derived data for Historical Spending Section (filtered by historyFilterUser)
   const filteredHistoricalData = useMemo(() => {
@@ -399,7 +401,7 @@ function App() {
             expenses: annualDataMap[year].months[monthKey].expenses.sort((a, b) => (b.timestamp?.toDate() || 0) - (a.timestamp?.toDate() || 0)) 
           }))
       }));
-  }, [expenses, historyFilterUser, userName1, userName2, getActualPayerForCalculation, isSettlementExpense]);
+  }, [expenses, historyFilterUser, userName1, userName2, isSettlementExpense]); // getActualPayerForCalculation non è più una dipendenza qui
 
 
   // Calculate balance for current period
@@ -440,7 +442,7 @@ function App() {
       netBalance: user1Net, 
       summary: summary
     };
-  }, [expenses, userName1, userName2, getActualPayerForCalculation, isSettlementExpense]); 
+  }, [expenses, userName1, userName2, isSettlementExpense]); // getActualPayerForCalculation non è più una dipendenza qui
 
   const { netBalance, summary } = calculateBalance(); 
 
@@ -501,7 +503,7 @@ function App() {
       monthlyAverage: monthlyAverage.toFixed(2),
       annualAverage: annualAverage.toFixed(2),
       spendingByCategory: Object.entries(spendingByCategory).map(([cat, val]) => ({ category: cat, total: val.toFixed(2) })),
-      monthlyTrends: filteredMonthlySpendingData.map(data => ({ month: `${getMonthName(data.name)} ${data.name.split('-')[0]}`, total: data.total.toFixed(2) })),
+      monthlyTrends: filteredMonthlySpendingData.map(data => ({ month: `${getMonthName(parseInt(data.name.split('-')[1]))} ${data.name.split('-')[0]}`, total: data.total.toFixed(2) })),
       annualTrends: filteredAnnualSpendingData.map(data => ({ year: data.name, total: data.total.toFixed(2) }))
     };
 
