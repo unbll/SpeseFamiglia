@@ -421,47 +421,59 @@ function App() {
 
   // Calculate balance for current period
   const calculateBalance = useCallback(() => {
-    let user1NetBalance = 0; // Rappresenta la posizione netta di user1 (quanto ha pagato in più/meno, inclusi i ripianamenti)
-    let totalOverallExpensesForShare = 0; // Totale delle spese da dividere equamente (escluse quelle di ripianamento)
+    let totalPaidBy1Shared = 0; // Only non-settlement expenses paid by user1
+    let totalPaidBy2Shared = 0; // Only non-settlement expenses paid by user2
+    let totalOverallSharedExpenses = 0; // Sum of all non-settlement expenses
+
+    let totalSettlementFromUser1ToUser2 = 0; // Sum of amounts user1 paid user2 in settlements
+    let totalSettlementFromUser2ToUser1 = 0; // Sum of amounts user2 paid user1 in settlements
 
     expenses.forEach(expense => {
       const actualPayer = getActualPayerForCalculation(expense.paidBy, userName1, userName2);
 
       if (!isSettlementExpense(expense)) {
-        // Spesa normale: contribuisce al totale complessivo da dividere
-        totalOverallExpensesForShare += expense.amount;
+        // Normal expenses
+        totalOverallSharedExpenses += expense.amount;
         if (actualPayer === userName1) {
-          user1NetBalance += expense.amount; // User1 ha pagato, il suo saldo netto aumenta
+          totalPaidBy1Shared += expense.amount;
         } else if (actualPayer === userName2) {
-          user1NetBalance -= expense.amount; // User2 ha pagato, il saldo netto di user1 diminuisce (user1 deve di più)
+          totalPaidBy2Shared += expense.amount;
         }
       } else {
-        // Spesa di ripianamento: trasferimento diretto di denaro, non contribuisce alle spese condivise
-        if (expense.paidBy === userName2) { 
-          user1NetBalance += expense.amount; // userName2 ha pagato userName1, quindi il saldo netto di userName1 aumenta
-        } else if (expense.paidBy === userName1) { 
-          user1NetBalance -= expense.amount; // userName1 ha pagato userName2, quindi il saldo netto di userName1 diminuisce
+        // Settlement expenses
+        if (actualPayer === userName1) { // User1 paid User2 for settlement
+          totalSettlementFromUser1ToUser2 += expense.amount;
+        } else if (actualPayer === userName2) { // User2 paid User1 for settlement
+          totalSettlementFromUser2ToUser1 += expense.amount;
         }
       }
     });
 
-    const sharePerPerson = totalOverallExpensesForShare / 2;
+    const sharePerPerson = totalOverallSharedExpenses / 2;
 
-    // Il saldo finale di user1 è la sua posizione netta accumulata meno la sua quota delle spese complessive
-    const finalUser1Net = user1NetBalance - sharePerPerson;
+    // Calculate initial net balance based on shared expenses
+    let user1Net = totalPaidBy1Shared - sharePerPerson;
+
+    // Now, apply the net effect of all settlement transactions
+    // If User1 paid User2 for settlement, User1's debt reduces (or credit increases).
+    // So user1Net should INCREASE.
+    user1Net += totalSettlementFromUser1ToUser2;
+    // If User2 paid User1 for settlement, User1's debt increases (or credit decreases).
+    // So user1Net should DECREASE.
+    user1Net -= totalSettlementFromUser2ToUser1;
+
 
     let summary = 'Siete in pari!';
-    // Usa un piccolo epsilon per il confronto con i numeri floating point
-    if (Math.abs(finalUser1Net) < 0.01) { // Se il saldo è effettivamente zero
+    if (Math.abs(user1Net) < 0.01) {
         summary = 'Siete in pari!';
-    } else if (finalUser1Net > 0) { 
-        summary = `${userName2} deve dare ${userName1} ${Math.abs(finalUser1Net).toFixed(2)}€`;
-    } else { // finalUser1Net < 0
-        summary = `${userName1} deve dare ${userName2} ${Math.abs(finalUser1Net).toFixed(2)}€`;
+    } else if (user1Net > 0) {
+        summary = `${userName2} deve dare ${userName1} ${Math.abs(user1Net).toFixed(2)}€`;
+    } else { // user1Net < 0
+        summary = `${userName1} deve dare ${userName2} ${Math.abs(user1Net).toFixed(2)}€`;
     }
 
     return {
-      netBalance: finalUser1Net, 
+      netBalance: user1Net,
       summary: summary
     };
   }, [expenses, userName1, userName2, isSettlementExpense]); 
@@ -488,7 +500,7 @@ function App() {
     if (netBalance > 0) { 
       payer = userName2;
       description = `Ripianamento saldo da ${userName2} a ${userName1}`;
-    } else { 
+    } else { // netBalance < 0
       payer = userName1;
       description = `Ripianamento saldo da ${userName1} a ${userName2}`;
     }
