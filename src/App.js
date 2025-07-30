@@ -168,26 +168,32 @@ function App() {
 
   // Initialize Firebase and set up auth listener
   useEffect(() => {
-    const app = initializeApp(firebaseConfig);
-    const firestoreDb = getFirestore(app);
-    const firebaseAuth = getAuth(app);
+    try { // Aggiunto blocco try-catch per la gestione degli errori di inizializzazione
+      const app = initializeApp(firebaseConfig);
+      const firestoreDb = getFirestore(app);
+      const firebaseAuth = getAuth(app);
 
-    setDb(firestoreDb);
+      setDb(firestoreDb);
 
-    // Listener per i cambiamenti dello stato di autenticazione
-    const unsubscribeAuth = onAuthStateChanged(firebaseAuth, (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        setUserId(currentUser.uid);
-        console.log("Authenticated with userId:", currentUser.uid);
-      } else {
-        setUserId(null); // Nessun utente autenticato
-        console.log("No user is signed in.");
-      }
-      setLoading(false);
-    });
+      // Listener per i cambiamenti dello stato di autenticazione
+      const unsubscribeAuth = onAuthStateChanged(firebaseAuth, (currentUser) => {
+        setUser(currentUser);
+        if (currentUser) {
+          setUserId(currentUser.uid);
+          console.log("Authenticated with userId:", currentUser.uid);
+        } else {
+          setUserId(null); // Nessun utente autenticato
+          console.log("No user is signed in.");
+        }
+        setLoading(false); // Imposta loading a false una volta determinato lo stato di autenticazione
+      });
 
-    return () => unsubscribeAuth(); // Cleanup listener on component unmount
+      return () => unsubscribeAuth(); // Cleanup listener on component unmount
+    } catch (e) {
+      console.error("Error initializing Firebase:", e);
+      setError(`Errore durante l'inizializzazione di Firebase: ${e.message}. Controlla la tua configurazione di Firebase.`);
+      setLoading(false); // Assicurati che loading sia false anche in caso di errore di inizializzazione
+    }
   }, []);
 
   // Fetch expenses from Firestore (only if user is authenticated)
