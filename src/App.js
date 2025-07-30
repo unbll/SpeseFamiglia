@@ -113,10 +113,9 @@ function App() {
   const [expandedMonths, setExpandedMonths] = useState(new Set());
 
   // Stati per l'inserimento manuale di mese e anno per le spese
-  const currentMonth = new Date().getMonth() + 1; // Mese corrente (1-12)
-  const currentYear = new Date().getFullYear(); // Anno corrente
-  const [expenseMonth, setExpenseMonth] = useState(currentMonth);
-  const [expenseYear, setExpenseYear] = useState(currentYear);
+  const today = new Date();
+  const defaultExpenseDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const [expenseDate, setExpenseDate] = useState(defaultExpenseDate);
 
   // Funzioni per il toggle dell'espansione
   const toggleYear = (year) => {
@@ -436,8 +435,6 @@ function App() {
         if (actualPayer === userName1) {
           totalPaidBy1Shared += expense.amount;
         } 
-        // No else if for totalPaidBy2Shared, as it's not directly used in the final user1Net calculation
-        // and totalOverallSharedExpenses already accounts for both payers.
       } else {
         // Settlement expenses
         if (actualPayer === userName1) { // User1 paid User2 for settlement
@@ -589,14 +586,10 @@ function App() {
 
   // Add a new expense
   const addExpense = async () => {
-    if (!db || !userId || !description || !amount || isNaN(parseFloat(amount))) {
-      setError("Per favor, inserisci una descrizione e un importo valido, e assicurati di essere autenticato.");
+    if (!db || !userId || !description || !amount || isNaN(parseFloat(amount)) || !expenseDate) {
+      setError("Per favor, inserisci una descrizione, un importo valido e una data, e assicurati di essere autenticato.");
       return;
     }
-
-    // Crea un oggetto Date con il mese e l'anno selezionati (il mese è 0-based in Date)
-    // Usiamo il giorno 15 per evitare problemi con i mesi che hanno meno di 31 giorni
-    const selectedDate = new Date(expenseYear, expenseMonth - 1, 15);
 
     try {
       setLoading(true);
@@ -606,13 +599,11 @@ function App() {
         amount: parseFloat(amount),
         paidBy,
         category,
-        timestamp: selectedDate // Usa la data selezionata
+        timestamp: new Date(expenseDate) // Usa la data selezionata dal campo input
       });
       setDescription('');
       setAmount('');
-      // Reimposta il mese e l'anno ai valori correnti dopo l'aggiunta
-      setExpenseMonth(currentMonth);
-      setExpenseYear(currentYear);
+      setExpenseDate(defaultExpenseDate); // Reimposta alla data corrente dopo l'aggiunta
       setError(null);
       console.log("Expense added successfully.");
     } catch (e) {
@@ -692,7 +683,8 @@ function App() {
 
   // Helper to format month name
   const getMonthName = (monthNumber) => {
-    const date = new Date(currentYear, monthNumber - 1); // Usa un anno qualsiasi, solo per il nome del mese
+    const date = new Date();
+    date.setMonth(monthNumber - 1); // Imposta il mese (0-based)
     return date.toLocaleString('it-IT', { month: 'long' });
   };
 
@@ -706,15 +698,16 @@ function App() {
     return paidByValue; 
   }, [userName1, userName2]); 
 
-  // Genera un array di anni per il dropdown
+  // Genera un array di anni per il dropdown (non più usato per la selezione, ma può servire per altre logiche)
   const years = useMemo(() => {
+    const currentYear = new Date().getFullYear();
     const startYear = currentYear - 5; // Ultimi 5 anni + corrente
     const yearsArray = [];
     for (let i = currentYear; i >= startYear; i--) {
       yearsArray.push(i);
     }
     return yearsArray;
-  }, [currentYear]);
+  }, []);
 
   // useEffect per aggiungere la favicon
   useEffect(() => {
@@ -863,32 +856,16 @@ function App() {
                     ))}
                   </select>
                 </div>
-                {/* Nuovi campi per Mese e Anno */}
-                <div>
-                  <label htmlFor="expenseMonth" className="block text-gray-300 text-sm font-medium mb-1">Mese</label>
-                  <select
-                    id="expenseMonth"
+                {/* Nuovo campo per la Data */}
+                <div className="col-span-1 sm:col-span-2"> {/* Occupa tutta la larghezza su mobile, metà su desktop */}
+                  <label htmlFor="expenseDate" className="block text-gray-300 text-sm font-medium mb-1">Data Spesa</label>
+                  <input
+                    type="date"
+                    id="expenseDate"
                     className="w-full p-3 rounded-lg bg-zinc-900 border border-zinc-700 focus:ring-purple-500 focus:border-purple-500 text-gray-100"
-                    value={expenseMonth}
-                    onChange={(e) => setExpenseMonth(parseInt(e.target.value))}
-                  >
-                    {[...Array(12).keys()].map(i => (
-                      <option key={i + 1} value={i + 1}>{getMonthName(i + 1)}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="expenseYear" className="block text-gray-300 text-sm font-medium mb-1">Anno</label>
-                  <select
-                    id="expenseYear"
-                    className="w-full p-3 rounded-lg bg-zinc-900 border border-zinc-700 focus:ring-purple-500 focus:border-purple-500 text-gray-100"
-                    value={expenseYear}
-                    onChange={(e) => setExpenseYear(parseInt(e.target.value))}
-                  >
-                    {years.map(year => (
-                      <option key={year} value={year}>{year}</option>
-                    ))}
-                  </select>
+                    value={expenseDate}
+                    onChange={(e) => setExpenseDate(e.target.value)}
+                  />
                 </div>
               </div>
               <button
