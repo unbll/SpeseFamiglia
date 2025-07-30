@@ -3,10 +3,18 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query } from 'firebase/firestore';
 
-// Global variables provided by the Canvas environment
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null; 
+// Variabili di configurazione Firebase (DA SOSTITUIRE CON I TUOI DATI REALI!)
+const firebaseConfig = {
+  apiKey: "IL_TUO_API_KEY_QUI",
+  authDomain: "IL_TUO_AUTH_DOMAIN_QUI",
+  projectId: "IL_TUO_PROJECT_ID_QUI",
+  storageBucket: "IL_TUO_STORAGE_BUCKET_QUI",
+  messagingSenderId: "IL_TUO_MESSAGING_SENDER_ID_QUI",
+  appId: "IL_TUO_APP_ID_DI_FIREBASE_QUI" // Questo è l'appId di Firebase, non il nostro appId logico
+};
+
+// Il tuo ID logico per l'applicazione (può essere una stringa a tua scelta, usala per la collezione Firestore)
+const appId = 'IL_TUO_APP_ID_UNICO_QUI'; // Esempio: 'spese-famiglia-rossi'
 
 function App() {
   const [db, setDb] = useState(null);
@@ -76,15 +84,10 @@ function App() {
         setDb(firestoreDb);
         setAuth(firebaseAuth);
 
-        // Sign in user
-        if (initialAuthToken) {
-          console.log("Attempting sign-in with custom token...");
-          await signInWithCustomToken(firebaseAuth, initialAuthToken);
-        } else {
-          console.log("Attempting anonymous sign-in...");
-          await signInAnonymously(firebaseAuth);
-        }
-
+        // Su Firebase Hosting, useremo l'autenticazione anonima o altri metodi Firebase.
+        // Rimuoviamo la dipendenza da __initial_auth_token che è specifica dell'ambiente Canvas.
+        await signInAnonymously(firebaseAuth);
+        
         onAuthStateChanged(firebaseAuth, (user) => {
           if (user) {
             setUserId(user.uid);
@@ -103,7 +106,7 @@ function App() {
     };
 
     initializeFirebase();
-  }, [initialAuthToken, firebaseConfig]);
+  }, [firebaseConfig]); // initialAuthToken rimosso dalle dipendenze
 
   // Fetch expenses from Firestore
   useEffect(() => {
@@ -113,6 +116,8 @@ function App() {
     }
 
     console.log("Fetching expenses for userId:", userId);
+    // Path per i dati pubblici su Firestore: /artifacts/{appId}/public/data/{your_collection_name}
+    // Assicurati che le regole di sicurezza di Firestore permettano la lettura/scrittura per gli utenti autenticati.
     const expensesCollectionRef = collection(db, `artifacts/${appId}/public/data/expenses`);
     const q = query(expensesCollectionRef);
 
@@ -139,7 +144,7 @@ function App() {
       let totalSum = 0;
       const uniqueMonths = new Set();
       const uniqueYears = new Set();
-      const categoryTotals = {}; // For spending by category
+      const categoryTotals = {}; 
 
       expenses.forEach(expense => {
         const date = expense.timestamp?.toDate();
@@ -151,7 +156,6 @@ function App() {
           uniqueMonths.add(monthYear);
           uniqueYears.add(year);
 
-          // Aggregate by category
           categoryTotals[expense.category] = (categoryTotals[expense.category] || 0) + expense.amount;
         }
       });
@@ -162,7 +166,7 @@ function App() {
       setPerpetualTotal(totalSum);
       setMonthlyAverage(avgMonthly);
       setAnnualAverage(avgAnnual);
-      setSpendingByCategory(categoryTotals); // Set spending by category state
+      setSpendingByCategory(categoryTotals); 
     };
 
     processOverallSpendingData();
@@ -323,7 +327,7 @@ function App() {
     setLlmLoading(true);
     setLlmError(null);
     setLlmInsight(null);
-    setShowLlmInsight(true); // Always show section when generating
+    setShowLlmInsight(true); 
 
     const spendingDataSummary = {
       perpetualTotal: perpetualTotal.toFixed(2),
@@ -355,7 +359,7 @@ function App() {
       const chatHistory = [];
       chatHistory.push({ role: "user", parts: [{ text: prompt }] });
       const payload = { contents: chatHistory };
-      const apiKey = ""; // If you want to use models other than gemini-2.5-flash-preview-05-20 or imagen-3.0-generate-002, provide an API key here. Otherwise, leave this as-is.
+      const apiKey = ""; 
       const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
       const result = await retryFetch(apiUrl, {
