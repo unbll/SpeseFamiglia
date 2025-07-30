@@ -199,8 +199,8 @@ function App() {
     }
 
     console.log("Fetching expenses for userId:", userId);
-    // NUOVO PERCORSO: artifacts/${appId}/users/${userId}/expenses
-    const expensesCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/expenses`);
+    // MODIFICA QUI: Ora le spese vengono lette da una collezione pubblica/condivisa
+    const expensesCollectionRef = collection(db, `artifacts/${appId}/public/expenses`);
     const q = query(expensesCollectionRef);
 
     const unsubscribeFirestore = onSnapshot(q, (snapshot) => {
@@ -226,6 +226,7 @@ function App() {
       return;
     }
 
+    // Anche i nomi della coppia sono ora in una collezione condivisa (non per utente specifico)
     const settingsDocRef = doc(db, `artifacts/${appId}/settings/couple_names`);
 
     const unsubscribeSettings = onSnapshot(settingsDocRef, (docSnap) => {
@@ -256,6 +257,7 @@ function App() {
     }
     try {
       setLoading(true); 
+      // Anche il salvataggio dei nomi della coppia è ora nella collezione condivisa
       const settingsDocRef = doc(db, `artifacts/${appId}/settings/couple_names`);
       await setDoc(settingsDocRef, {
         user1Name: editingUserName1, 
@@ -503,7 +505,8 @@ function App() {
 
     try {
       setLoading(true);
-      const expensesCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/expenses`);
+      // MODIFICA QUI: La transazione di ripianamento va nella collezione pubblica
+      const expensesCollectionRef = collection(db, `artifacts/${appId}/public/expenses`);
       await addDoc(expensesCollectionRef, {
         description: description,
         amount: settlementAmount,
@@ -593,7 +596,8 @@ function App() {
 
     try {
       setLoading(true);
-      const expensesCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/expenses`);
+      // MODIFICA QUI: Le spese vengono aggiunte alla collezione pubblica
+      const expensesCollectionRef = collection(db, `artifacts/${appId}/public/expenses`);
       await addDoc(expensesCollectionRef, {
         description,
         amount: parseFloat(amount),
@@ -629,7 +633,8 @@ function App() {
 
     try {
       setLoading(true);
-      await deleteDoc(doc(db, `artifacts/${appId}/users/${userId}/expenses`, expenseToDelete));
+      // MODIFICA QUI: Le spese vengono eliminate dalla collezione pubblica
+      await deleteDoc(doc(db, `artifacts/${appId}/public/expenses`, expenseToDelete));
       setError(null);
       console.log("Expense deleted successfully.");
     } catch (e) {
@@ -697,17 +702,6 @@ function App() {
     }
     return paidByValue; 
   }, [userName1, userName2]); 
-
-  // Genera un array di anni per il dropdown (non più usato per la selezione, ma può servire per altre logiche)
-  // const years = useMemo(() => { // Rimosso perché non più utilizzato
-  //   const currentYear = new Date().getFullYear();
-  //   const startYear = currentYear - 5; // Ultimi 5 anni + corrente
-  //   const yearsArray = [];
-  //   for (let i = currentYear; i >= startYear; i--) {
-  //     yearsArray.push(i);
-  //   }
-  //   return yearsArray;
-  // }, []);
 
   // useEffect per aggiungere la favicon
   useEffect(() => {
