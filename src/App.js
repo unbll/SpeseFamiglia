@@ -422,7 +422,6 @@ function App() {
   // Calculate balance for current period
   const calculateBalance = useCallback(() => {
     let totalPaidBy1Shared = 0; // Only non-settlement expenses paid by user1
-    let totalPaidBy2Shared = 0; // Only non-settlement expenses paid by user2
     let totalOverallSharedExpenses = 0; // Sum of all non-settlement expenses
 
     let totalSettlementFromUser1ToUser2 = 0; // Sum of amounts user1 paid user2 in settlements
@@ -436,9 +435,9 @@ function App() {
         totalOverallSharedExpenses += expense.amount;
         if (actualPayer === userName1) {
           totalPaidBy1Shared += expense.amount;
-        } else if (actualPayer === userName2) {
-          totalPaidBy2Shared += expense.amount;
-        }
+        } 
+        // No else if for totalPaidBy2Shared, as it's not directly used in the final user1Net calculation
+        // and totalOverallSharedExpenses already accounts for both payers.
       } else {
         // Settlement expenses
         if (actualPayer === userName1) { // User1 paid User2 for settlement
