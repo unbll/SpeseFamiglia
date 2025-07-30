@@ -422,7 +422,7 @@ function App() {
   // Calculate balance for current period
   const calculateBalance = useCallback(() => {
     let totalPaidBy1 = 0;
-    let totalPaidBy2 = 0;
+    let totalPaidBy2 = 0; // Questa variabile è necessaria per il calcolo interno, anche se user2Net non è usato direttamente
     let totalOverallExpensesForShare = 0; // Nuovo totale per la divisione equa
 
     expenses.forEach(expense => {
@@ -455,7 +455,7 @@ function App() {
     const sharePerPerson = totalOverallExpensesForShare / 2;
 
     const user1Net = totalPaidBy1 - sharePerPerson; 
-    // user2Net non è più utilizzato direttamente, poiché il summary si basa su user1Net
+    // user2Net non è più utilizzato direttamente per il summary, ma totalPaidBy2 è necessario per calcolare user1Net correttamente
     // const user2Net = totalPaidBy2 - sharePerPerson; 
 
     let summary = 'Siete in pari!';
