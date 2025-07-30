@@ -47,6 +47,18 @@ const DEFAULT_USER1_NAME = 'Io';
 const DEFAULT_USER2_NAME = 'La mia ragazza';
 const SETTLEMENT_CATEGORY = 'Saldo Ripianato'; // Nuova costante per la categoria di ripianamento
 
+// Helper function to get the actual payer name for calculation purposes
+// Questa funzione è ora definita al di fuori del componente App per evitare problemi di dipendenza.
+// Non ha bisogno di useCallback perché non è una prop o uno stato del componente.
+const getActualPayerForCalculation = (paidByValue, currentUserName1, currentUserName2) => {
+  if (paidByValue === currentUserName1) return currentUserName1;
+  if (paidByValue === currentUserName2) return currentUserName2;
+  if (paidByValue === DEFAULT_USER1_NAME && currentUserName1 !== DEFAULT_USER1_NAME) return currentUserName1;
+  if (paidByValue === DEFAULT_USER2_NAME && currentUserName2 !== DEFAULT_USER2_NAME) return currentUserName2;
+  return paidByValue;
+};
+
+
 // ********************************************************************************
 // * FINE DELLE SOSTITUZIONI NECESSARIE *
 // ********************************************************************************
@@ -135,29 +147,6 @@ function App() {
   const isSettlementExpense = useCallback((expense) => {
     return expense.category === SETTLEMENT_CATEGORY;
   }, []);
-
-  // Helper function to get the actual payer name for calculation purposes
-  // Questa funzione è ora una normale funzione 'const' e non un useCallback
-  // Non ha bisogno di dipendenze perché usa solo i suoi parametri e costanti globali.
-  const getActualPayerForCalculation = (paidByValue, currentUserName1, currentUserName2) => {
-    // Se il valore memorizzato corrisponde al nome corrente dell'utente 1
-    if (paidByValue === currentUserName1) return currentUserName1;
-    // Se il valore memorizzato corrisponde al nome corrente dell'utente 2
-    if (paidByValue === currentUserName2) return currentUserName2;
-
-    // Se il valore memorizzato è il nome predefinito dell'utente 1 ('Io')
-    // E il nome corrente dell'utente 1 è diverso dal predefinito,
-    // allora questa spesa è stata pagata dall'utente 1 (con il suo vecchio nome).
-    if (paidByValue === DEFAULT_USER1_NAME && currentUserName1 !== DEFAULT_USER1_NAME) return currentUserName1;
-    // Se il valore memorizzato è il nome predefinito dell'utente 2 ('La mia ragazza')
-    // E il nome corrente dell'utente 2 è diverso dal predefinito,
-    // allora questa spesa è stata pagata dall'utente 2 (con il suo vecchio nome).
-    if (paidByValue === DEFAULT_USER2_NAME && currentUserName2 !== DEFAULT_USER2_NAME) return currentUserName2;
-
-    // In tutti gli altri casi (es. il nome predefinito è ancora in uso, o è un nome personalizzato già presente),
-    // restituisci il valore memorizzato.
-    return paidByValue;
-  };
 
   // Utility function for exponential backoff
   const retryFetch = async (url, options, retries = 3, delay = 1000) => {
@@ -466,7 +455,8 @@ function App() {
     const sharePerPerson = totalOverallExpensesForShare / 2;
 
     const user1Net = totalPaidBy1 - sharePerPerson; 
-    const user2Net = totalPaidBy2 - sharePerPerson; 
+    // user2Net non è più utilizzato direttamente, poiché il summary si basa su user1Net
+    // const user2Net = totalPaidBy2 - sharePerPerson; 
 
     let summary = 'Siete in pari!';
     // Usa un piccolo epsilon per il confronto con i numeri floating point
@@ -482,7 +472,7 @@ function App() {
       netBalance: user1Net, 
       summary: summary
     };
-  }, [expenses, userName1, userName2, isSettlementExpense, getActualPayerForCalculation]); 
+  }, [expenses, userName1, userName2, isSettlementExpense]); 
 
   const { netBalance, summary } = calculateBalance(); 
 
@@ -723,6 +713,18 @@ function App() {
     return yearsArray;
   }, [currentYear]);
 
+  // useEffect per aggiungere la favicon
+  useEffect(() => {
+    const link = document.createElement('link');
+    link.rel = 'icon';
+    link.href = 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>%24</text></svg>';
+    document.head.appendChild(link);
+
+    return () => {
+      document.head.removeChild(link);
+    };
+  }, []); // Esegui solo una volta al montaggio
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-900 text-gray-100">
@@ -735,7 +737,7 @@ function App() {
     <div className="min-h-screen bg-zinc-900 text-gray-100 font-inter p-4 sm:p-6 md:p-8 flex flex-col items-center">
       <div className="w-full max-w-3xl bg-zinc-800 rounded-xl shadow-lg p-6 sm:p-8 md:p-10 mb-8">
         <h1 className="text-3xl sm:text-4xl font-bold text-purple-400 mb-4 text-center">
-          Gestione Spese di Coppia
+          Gestione Spese Casetta
         </h1>
         <p className="text-gray-400 text-center mb-6">
           {user ? `Benvenuto, ${user.email}!` : "Accedi per gestire le tue spese."}
