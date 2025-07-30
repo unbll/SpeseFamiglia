@@ -205,8 +205,7 @@ function App() {
     }
 
     console.log("Fetching expenses for userId:", userId);
-    // MODIFICA QUI: Ora le spese vengono lette da una collezione pubblica/condivisa
-    // Il percorso è ora 'shared_data/{appId}/expenses'
+    // Le spese vengono lette dalla collezione condivisa: 'shared_data/{appId}/expenses'
     const expensesCollectionRef = collection(db, 'shared_data', appId, 'expenses');
     const q = query(expensesCollectionRef);
 
@@ -221,6 +220,8 @@ function App() {
       console.log("Expenses fetched successfully.");
     }, (err) => {
       console.error("Error fetching expenses:", err);
+      // *** IMPORTANTE: Se vedi questo errore, controlla le tue regole di sicurezza di Firestore! ***
+      // Devono consentire la lettura e la scrittura a 'shared_data/{appId}/expenses' per gli utenti autenticati.
       setError("Errore nel caricamento delle spese. Riprova. Controlla i permessi di Firestore.");
     });
 
@@ -234,7 +235,7 @@ function App() {
     }
 
     // Anche i nomi della coppia sono ora in una collezione condivisa (non per utente specifico)
-    // Il percorso è ora 'shared_data/{appId}/settings/couple_names'
+    // Il percorso è 'shared_data/{appId}/settings/couple_names'
     const settingsDocRef = doc(db, 'shared_data', appId, 'settings', 'couple_names');
 
     const unsubscribeSettings = onSnapshot(settingsDocRef, (docSnap) => {
@@ -251,6 +252,8 @@ function App() {
       }
     }, (err) => {
       console.error("Error fetching couple names settings:", err);
+      // *** IMPORTANTE: Se vedi questo errore, controlla le tue regole di sicurezza di Firestore! ***
+      // Devono consentire la lettura e la scrittura a 'shared_data/{appId}/settings/couple_names' per gli utenti autenticati.
       setError("Errore nel caricamento dei nomi della coppia. Riprova.");
     });
 
@@ -265,7 +268,7 @@ function App() {
     }
     try {
       setLoading(true); 
-      // Anche il salvataggio dei nomi della coppia è ora nella collezione condivisa
+      // Il salvataggio dei nomi della coppia è ora nella collezione condivisa
       const settingsDocRef = doc(db, 'shared_data', appId, 'settings', 'couple_names');
       await setDoc(settingsDocRef, {
         user1Name: editingUserName1, 
@@ -513,7 +516,7 @@ function App() {
 
     try {
       setLoading(true);
-      // MODIFICA QUI: La transazione di ripianamento va nella collezione pubblica
+      // La transazione di ripianamento va nella collezione pubblica
       const expensesCollectionRef = collection(db, 'shared_data', appId, 'expenses');
       await addDoc(expensesCollectionRef, {
         description: description,
@@ -604,7 +607,7 @@ function App() {
 
     try {
       setLoading(true);
-      // MODIFICA QUI: Le spese vengono aggiunte alla collezione pubblica
+      // Le spese vengono aggiunte alla collezione pubblica
       const expensesCollectionRef = collection(db, 'shared_data', appId, 'expenses');
       await addDoc(expensesCollectionRef, {
         description,
@@ -641,7 +644,7 @@ function App() {
 
     try {
       setLoading(true);
-      // MODIFICA QUI: Le spese vengono eliminate dalla collezione pubblica
+      // Le spese vengono eliminate dalla collezione pubblica
       await deleteDoc(doc(db, 'shared_data', appId, 'expenses', expenseToDelete));
       setError(null);
       console.log("Expense deleted successfully.");
