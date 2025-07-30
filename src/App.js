@@ -89,6 +89,36 @@ function App() {
   const [llmError, setErrorLlm] = useState(null); // Rinominato per evitare conflitto con setError generale
   const [showLlmInsight, setShowLlmInsight] = useState(false); // State to toggle LLM insight visibility
 
+  // Stati per la gestione dell'espansione/collasso nello storico dettagliato
+  const [expandedYears, setExpandedYears] = useState(new Set());
+  const [expandedMonths, setExpandedMonths] = useState(new Set());
+
+  // Funzioni per il toggle dell'espansione
+  const toggleYear = (year) => {
+    setExpandedYears(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(year)) {
+        newSet.delete(year);
+      } else {
+        newSet.add(year);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleMonth = (monthYear) => {
+    setExpandedMonths(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(monthYear)) {
+        newSet.delete(monthYear);
+      } else {
+        newSet.add(monthYear);
+      }
+      return newSet;
+    });
+  };
+
+
   // Utility function for exponential backoff
   const retryFetch = async (url, options, retries = 3, delay = 1000) => {
     try {
@@ -567,6 +597,16 @@ function App() {
     return date.toLocaleString('it-IT', { month: 'long' });
   };
 
+  // Helper function to get the display name for 'paidBy'
+  const getDisplayName = useCallback((paidByValue) => {
+    if (paidByValue === 'Io') {
+      return userName1;
+    } else if (paidByValue === 'La mia ragazza') {
+      return userName2;
+    }
+    return paidByValue; // Return as is if it's already a custom name
+  }, [userName1, userName2]); // Dipendenze per useCallback
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-900 text-gray-100">
@@ -894,22 +934,56 @@ function App() {
                   {filteredHistoricalData.length > 0 ? (
                     <div className="space-y-4">
                       {filteredHistoricalData.map(yearData => (
-                        <div key={yearData.name} className="bg-zinc-600 p-4 rounded-lg shadow-sm">
-                          <h4 className="text-lg font-bold text-gray-100 mb-2">{yearData.name}: {yearData.total.toFixed(2)}€</h4>
-                          <ul className="list-disc list-inside text-gray-300 ml-4 space-y-2"> 
-                            {yearData.months.map(monthData => (
-                              <li key={monthData.name}>
-                                <p className="font-semibold text-gray-100">{getMonthName(monthData.name)}: {monthData.total.toFixed(2)}€</p>
-                                <ul className="list-circle list-inside text-gray-400 ml-4 space-y-1"> 
-                                  {monthData.expenses.map(expense => (
-                                    <li key={expense.id} className="text-sm">
-                                      {expense.description} - {expense.amount.toFixed(2)}€ (pagato da {expense.paidBy})
-                                    </li>
-                                  ))}
-                                </ul>
-                              </li>
-                            ))}
-                          </ul>
+                        <div key={yearData.name} 
+                             className="bg-zinc-600 p-4 rounded-lg shadow-sm cursor-pointer hover:bg-zinc-500 transition duration-200"
+                             onClick={() => toggleYear(yearData.name)}>
+                          <div className="flex justify-between items-center">
+                            <h4 className="text-lg font-bold text-gray-100">{yearData.name}: {yearData.total.toFixed(2)}€</h4>
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className={`h-5 w-5 text-gray-300 transform transition-transform duration-200 ${
+                                expandedYears.has(yearData.name) ? 'rotate-90' : ''
+                              }`}
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                            </svg>
+                          </div>
+                          {expandedYears.has(yearData.name) && (
+                            <ul className="list-none text-gray-300 mt-4 space-y-2"> 
+                              {yearData.months.map(monthData => (
+                                <li key={monthData.name}
+                                    className="bg-zinc-700 p-3 rounded-md cursor-pointer hover:bg-zinc-600 transition duration-200"
+                                    onClick={(e) => { e.stopPropagation(); toggleMonth(monthData.name); }}>
+                                  <div className="flex justify-between items-center">
+                                    <p className="font-semibold text-gray-100">{getMonthName(monthData.name)}: {monthData.total.toFixed(2)}€</p>
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      className={`h-4 w-4 text-gray-400 transform transition-transform duration-200 ${
+                                        expandedMonths.has(monthData.name) ? 'rotate-90' : ''
+                                      }`}
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                                    </svg>
+                                  </div>
+                                  {expandedMonths.has(monthData.name) && (
+                                    <ul className="list-none text-gray-400 mt-2 ml-4 space-y-1"> 
+                                      {monthData.expenses.map(expense => (
+                                        <li key={expense.id} className="text-sm">
+                                          {expense.description} - {expense.amount.toFixed(2)}€ (pagato da {getDisplayName(expense.paidBy)})
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -940,7 +1014,7 @@ function App() {
                           <div>
                             <p className="text-lg font-medium text-gray-100">{expense.description}</p>
                             <p className="text-sm text-gray-400">
-                              <span className="font-semibold">{expense.paidBy}</span> ha pagato &bull; {expense.category}
+                              <span className="font-semibold">{getDisplayName(expense.paidBy)}</span> ha pagato &bull; {expense.category}
                             </p>
                             <p className="text-xs text-gray-500">
                               {expense.timestamp && new Date(expense.timestamp.toDate()).toLocaleString('it-IT')}
