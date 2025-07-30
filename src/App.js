@@ -60,6 +60,10 @@ function App() {
   const [error, setError] = useState(null);
   const [userName1, setUserName1] = useState('Io');
   const [userName2, setUserName2] = useState('La mia ragazza');
+  // Nuovi stati locali per la modifica dei nomi utente
+  const [editingUserName1, setEditingUserName1] = useState('Io');
+  const [editingUserName2, setEditingUserName2] = useState('La mia ragazza');
+
   const [showSettings, setShowSettings] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState(null);
@@ -171,6 +175,9 @@ function App() {
         const data = docSnap.data();
         setUserName1(data.user1Name || 'Io');
         setUserName2(data.user2Name || 'La mia ragazza');
+        // Aggiorna anche gli stati di editing quando i nomi globali cambiano (es. caricamento iniziale o aggiornamento da altro utente)
+        setEditingUserName1(data.user1Name || 'Io');
+        setEditingUserName2(data.user2Name || 'La mia ragazza');
         console.log("Couple names loaded from Firestore:", data);
       } else {
         // If document doesn't exist, save default names
@@ -183,43 +190,35 @@ function App() {
       setError("Errore nel caricamento dei nomi della coppia. Riprova.");
     });
 
-    // Rimosso 'appId' dalle dipendenze, poiché è una costante esterna e non cambia.
-    // Mantenuti userName1 e userName2 per garantire che il listener si riattivi
-    // se i valori iniziali di default cambiano prima del caricamento da Firestore.
     return () => unsubscribeSettings();
-  }, [db, userId, userName1, userName2]); // Correzione: Rimosso appId
+  }, [db, userId]); // Rimosso userName1 e userName2 dalle dipendenze per evitare loop con onSnapshot
 
   // Function to save couple names to Firestore
   const saveCoupleNames = useCallback(async () => {
     if (!db || !userId) {
-      // Non impostiamo error qui, poiché questa funzione è chiamata con debounce
-      // e il problema principale è l'input dell'utente, non la disponibilità iniziale del DB.
       return;
     }
     try {
-      // Rimosso setLoading(true) qui per evitare interruzioni durante la digitazione
       const settingsDocRef = doc(db, `artifacts/${appId}/settings/couple_names`);
       await setDoc(settingsDocRef, {
         user1Name: userName1,
         user2Name: userName2
-      }, { merge: true }); // 'merge: true' per non sovrascrivere altri campi se presenti
-      setError(null); // Pulisci errori precedenti se il salvataggio ha successo
+      }, { merge: true }); 
+      setError(null); 
       console.log("Couple names saved successfully.");
     } catch (e) {
       console.error("Error saving couple names: ", e);
       setError("Errore nel salvataggio dei nomi della coppia. Riprova.");
-    } finally {
-      // Rimosso setLoading(false) qui
     }
-  }, [db, userId, userName1, userName2]); // Dipendenze corrette
+  }, [db, userId, userName1, userName2]); 
 
-  // Call saveCoupleNames whenever userName1 or userName2 change
+  // Call saveCoupleNames whenever userName1 or userName2 change (after debounce)
   useEffect(() => {
-    if (db && userId) { // Ensure DB and user are ready
+    if (db && userId) { 
       const handler = setTimeout(() => {
         saveCoupleNames();
-      }, 500); // Debounce per 500ms
-      return () => clearTimeout(handler); // Cleanup on re-render or unmount
+      }, 500); 
+      return () => clearTimeout(handler); 
     }
   }, [userName1, userName2, db, userId, saveCoupleNames]); 
 
@@ -411,7 +410,7 @@ function App() {
   // Function to get spending insights from Gemini API
   const getSpendingInsights = async () => {
     setLlmLoading(true);
-    setErrorLlm(null); // Usa setErrorLlm
+    setErrorLlm(null); 
     setLlmInsight(null);
     setShowLlmInsight(true); // Always show section when generating
 
@@ -460,11 +459,11 @@ function App() {
         const text = result.candidates[0].content.parts[0].text;
         setLlmInsight(text);
       } else {
-        setErrorLlm("Nessun consiglio generato. Riprova."); // Usa setErrorLlm
+        setErrorLlm("Nessun consiglio generato. Riprova."); 
       }
     } catch (e) {
       console.error("Error calling Gemini API:", e);
-      setErrorLlm("Errore nella generazione dei consigli. Riprova."); // Usa setErrorLlm
+      setErrorLlm("Errore nella generazione dei consigli. Riprova."); 
     } finally {
       setLlmLoading(false);
     }
@@ -526,27 +525,6 @@ function App() {
       setExpenseToDelete(null);
     }
   };
-
-  // handleSignUp non è più utilizzata nell'interfaccia utente, quindi può essere rimossa
-  // o commentata per evitare avvisi di ESLint.
-  // const handleSignUp = async () => {
-  //   if (!email || !password) {
-  //     setError("Per favore, inserisci email e password.");
-  //     return;
-  //   }
-  //   try {
-  //     setLoading(true);
-  //     const authInstance = getAuth();
-  //     await createUserWithEmailAndPassword(authInstance, email, password);
-  //     setError(null);
-  //     alert("Registrazione avvenuta con successo! Ora puoi accedere.");
-  //   } catch (e) {
-  //     console.error("Error signing up:", e);
-  //     setError(`Errore durante la registrazione: ${e.message}`);
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
 
   // Handle user sign-in
   const handleSignIn = async () => {
@@ -813,9 +791,9 @@ function App() {
                         value={monthlyFilterUser}
                         onChange={(e) => setMonthlyFilterUser(e.target.value)}
                       >
-                        <option value="Tutti">Tutti</option>
                         <option value={userName1}>{userName1}</option>
                         <option value={userName2}>{userName2}</option>
+                        <option value="Tutti">Tutti</option>
                       </select>
                     </div>
                     {filteredMonthlySpendingData.length > 0 ? (
@@ -862,9 +840,9 @@ function App() {
                         value={annualFilterUser}
                         onChange={(e) => setAnnualFilterUser(e.target.value)}
                       >
-                        <option value="Tutti">Tutti</option>
                         <option value={userName1}>{userName1}</option>
                         <option value={userName2}>{userName2}</option>
+                        <option value="Tutti">Tutti</option>
                       </select>
                     </div>
                     {filteredAnnualSpendingData.length > 0 ? (
@@ -913,9 +891,9 @@ function App() {
                       value={historyFilterUser}
                       onChange={(e) => setHistoryFilterUser(e.target.value)}
                     >
-                      <option value="Tutti">Tutti</option>
                       <option value={userName1}>{userName1}</option>
                       <option value={userName2}>{userName2}</option>
+                      <option value="Tutti">Tutti</option>
                     </select>
                   </div>
                   {filteredHistoricalData.length > 0 ? (
@@ -1011,8 +989,9 @@ function App() {
                         type="text"
                         id="userName1"
                         className="w-full p-3 rounded-lg bg-zinc-900 border border-zinc-700 focus:ring-purple-500 focus:border-purple-500 text-gray-100"
-                        value={userName1}
-                        onChange={(e) => setUserName1(e.target.value)}
+                        value={editingUserName1} // Usa lo stato di editing locale
+                        onChange={(e) => setEditingUserName1(e.target.value)} // Aggiorna lo stato di editing locale
+                        onBlur={() => setUserName1(editingUserName1)} // Aggiorna lo stato globale solo al blur
                       />
                     </div>
                     <div>
@@ -1021,8 +1000,9 @@ function App() {
                         type="text"
                         id="userName2"
                         className="w-full p-3 rounded-lg bg-zinc-900 border border-zinc-700 focus:ring-purple-500 focus:border-purple-500 text-gray-100"
-                        value={userName2}
-                        onChange={(e) => setUserName2(e.target.value)}
+                        value={editingUserName2} // Usa lo stato di editing locale
+                        onChange={(e) => setEditingUserName2(e.target.value)} // Aggiorna lo stato di editing locale
+                        onBlur={() => setUserName2(editingUserName2)} // Aggiorna lo stato globale solo al blur
                       />
                     </div>
                   </div>
