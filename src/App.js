@@ -183,11 +183,11 @@ function App() {
       setError("Errore nel caricamento dei nomi della coppia. Riprova.");
     });
 
-    // Aggiunti userName1 e userName2 alle dipendenze per garantire che il listener
-    // si aggiorni se i valori iniziali di default cambiano prima del caricamento da Firestore.
-    // Anche se sono di "outer scope", qui influenzano il comportamento iniziale.
+    // Rimosso 'appId' dalle dipendenze, poiché è una costante esterna e non cambia.
+    // Mantenuti userName1 e userName2 per garantire che il listener si riattivi
+    // se i valori iniziali di default cambiano prima del caricamento da Firestore.
     return () => unsubscribeSettings();
-  }, [db, userId, appId, userName1, userName2]); // Correzione: Aggiunte userName1 e userName2
+  }, [db, userId, userName1, userName2]); // Correzione: Rimosso appId
 
   // Function to save couple names to Firestore
   const saveCoupleNames = useCallback(async () => {
@@ -210,8 +210,7 @@ function App() {
     } finally {
       setLoading(false);
     }
-  }, [db, userId, userName1, userName2]); // Correzione: Rimosso appId, è una costante esterna
-
+  }, [db, userId, userName1, userName2]); // Dipendenze corrette
 
   // Call saveCoupleNames whenever userName1 or userName2 change
   useEffect(() => {
