@@ -155,8 +155,11 @@ function App() {
       setError("Errore nel caricamento delle spese. Riprova. Controlla i permessi di Firestore.");
     });
 
+    // Rimosso 'appId' dall'array di dipendenze.
+    // 'appId' è una costante definita fuori dal componente e non cambierà,
+    // quindi non è necessario includerla qui.
     return () => unsubscribeFirestore();
-  }, [db, userId, appId]); // Aggiunto appId alle dipendenze
+  }, [db, userId]); 
 
   // Process overall spending data (perpetual, monthly/annual averages, and by category)
   useEffect(() => {
@@ -407,7 +410,7 @@ function App() {
   // Add a new expense
   const addExpense = async () => {
     if (!db || !userId || !description || !amount || isNaN(parseFloat(amount))) {
-      setError("Per favore, inserisci una descrizione e un importo valido, e assicurati di essere autenticato.");
+      setError("Per favor, inserisci una descrizione e un importo valido, e assicurati di essere autenticato.");
       return;
     }
 
