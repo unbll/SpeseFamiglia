@@ -82,7 +82,7 @@ function App() {
   // States for LLM integration
   const [llmInsight, setLlmInsight] = useState(null);
   const [llmLoading, setLlmLoading] = useState(false);
-  const [llmError, setLlmError] = useState(null);
+  const [llmError, setErrorLlm] = useState(null); // Rinominato per evitare conflitto con setError generale
   const [showLlmInsight, setShowLlmInsight] = useState(false); // State to toggle LLM insight visibility
 
   // Utility function for exponential backoff
@@ -192,33 +192,34 @@ function App() {
   // Function to save couple names to Firestore
   const saveCoupleNames = useCallback(async () => {
     if (!db || !userId) {
-      setError("Database non disponibile o utente non autenticato.");
+      // Non impostiamo error qui, poiché questa funzione è chiamata con debounce
+      // e il problema principale è l'input dell'utente, non la disponibilità iniziale del DB.
       return;
     }
     try {
-      setLoading(true);
+      // Rimosso setLoading(true) qui per evitare interruzioni durante la digitazione
       const settingsDocRef = doc(db, `artifacts/${appId}/settings/couple_names`);
       await setDoc(settingsDocRef, {
         user1Name: userName1,
         user2Name: userName2
       }, { merge: true }); // 'merge: true' per non sovrascrivere altri campi se presenti
-      setError(null);
+      setError(null); // Pulisci errori precedenti se il salvataggio ha successo
       console.log("Couple names saved successfully.");
     } catch (e) {
       console.error("Error saving couple names: ", e);
       setError("Errore nel salvataggio dei nomi della coppia. Riprova.");
     } finally {
-      setLoading(false);
+      // Rimosso setLoading(false) qui
     }
   }, [db, userId, userName1, userName2]); // Dipendenze corrette
 
   // Call saveCoupleNames whenever userName1 or userName2 change
   useEffect(() => {
-    if (db && userId) { // Only save if DB is ready and user is authenticated
+    if (db && userId) { // Ensure DB and user are ready
       const handler = setTimeout(() => {
         saveCoupleNames();
-      }, 500); // Debounce per evitare scritture eccessive
-      return () => clearTimeout(handler);
+      }, 500); // Debounce per 500ms
+      return () => clearTimeout(handler); // Cleanup on re-render or unmount
     }
   }, [userName1, userName2, db, userId, saveCoupleNames]); 
 
@@ -410,7 +411,7 @@ function App() {
   // Function to get spending insights from Gemini API
   const getSpendingInsights = async () => {
     setLlmLoading(true);
-    setLlmError(null);
+    setErrorLlm(null); // Usa setErrorLlm
     setLlmInsight(null);
     setShowLlmInsight(true); // Always show section when generating
 
@@ -459,11 +460,11 @@ function App() {
         const text = result.candidates[0].content.parts[0].text;
         setLlmInsight(text);
       } else {
-        setLlmError("Nessun consiglio generato. Riprova.");
+        setErrorLlm("Nessun consiglio generato. Riprova."); // Usa setErrorLlm
       }
     } catch (e) {
       console.error("Error calling Gemini API:", e);
-      setLlmError("Errore nella generazione dei consigli. Riprova.");
+      setErrorLlm("Errore nella generazione dei consigli. Riprova."); // Usa setErrorLlm
     } finally {
       setLlmLoading(false);
     }
