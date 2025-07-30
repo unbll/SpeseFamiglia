@@ -699,15 +699,15 @@ function App() {
   }, [userName1, userName2]); 
 
   // Genera un array di anni per il dropdown (non più usato per la selezione, ma può servire per altre logiche)
-  const years = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    const startYear = currentYear - 5; // Ultimi 5 anni + corrente
-    const yearsArray = [];
-    for (let i = currentYear; i >= startYear; i--) {
-      yearsArray.push(i);
-    }
-    return yearsArray;
-  }, []);
+  // const years = useMemo(() => { // Rimosso perché non più utilizzato
+  //   const currentYear = new Date().getFullYear();
+  //   const startYear = currentYear - 5; // Ultimi 5 anni + corrente
+  //   const yearsArray = [];
+  //   for (let i = currentYear; i >= startYear; i--) {
+  //     yearsArray.push(i);
+  //   }
+  //   return yearsArray;
+  // }, []);
 
   // useEffect per aggiungere la favicon
   useEffect(() => {
